@@ -1137,6 +1137,13 @@ const handlePhoneChange = React.useCallback(
   }, [lookup.hasActive, uiState]);
 
   const onApplyCoupon = React.useCallback(async (code: string) => {
+    // Map dos produtos por plano
+    const PRODUCT_ANNUAL  = "prod_T2PHY72W240SPT";
+    const PRODUCT_MONTHLY = "prod_T2PFiGU2QtGzY4";
+
+    // Decide o produto a partir do plano atual
+    const productId = isAnnual ? PRODUCT_ANNUAL : PRODUCT_MONTHLY;
+
     try {
       const resp = await fetch("https://n8n.dalzzen.com/webhook/promo/validate", {
         method: "POST",
@@ -1144,18 +1151,23 @@ const handlePhoneChange = React.useCallback(
           "Content-Type": "application/json",
           "x-api-key": "ZT6^HNWHJ6$dV8n5T6V7tioSzZ!W9BxHz#YZu5Si%Y8QUzd%TREEVADN@KDU@Pmz55uF!kKNMjG&g7f^nVEMxUqahCozK7%yZgFoMvis&8wf8Zvyhw&7kguxteBhqbDM"
         },
-        body: JSON.stringify({ code, mode: "subscription", priceId: "price_123", customerId: "cus_123" })
+        body: JSON.stringify({
+          code,
+          mode: "subscription",
+          productId,
+          plan: isAnnual ? "annual" : "monthly"
+        })
       }).then(r => r.json());
-  
+
       if (!resp.ok) return { ok: false, message: resp.message || "Código inválido." };
-  
+
       const p = Number(resp.discount);
       setApplied(Number.isFinite(p) ? { code, percentOff: p } : { code });
       return { ok: true };
     } catch {
       return { ok: false, message: "Erro ao validar o cupom." };
     }
-  }, []);
+  }, [isAnnual]);
 
   // Pega data da cobrança
   const trialDays = isAnnual ? 7 : 0;
