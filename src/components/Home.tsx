@@ -1363,10 +1363,10 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
               <a 
                 href="#precos" 
                 className="
-                  bg-blue-500 text-white px-8 py-4 rounded-lg 
+                  bg-blue-600 text-white px-8 py-4 rounded-lg 
                   font-medium text-lg shadow-md inline-flex items-center space-x-2
                   transition-all duration-500 ease-out
-                  hover:bg-blue-600 hover:shadow-lg
+                  hover:bg-blue-700 hover:shadow-lg
                 "
               >
                 <span>Quero utilizar</span>
