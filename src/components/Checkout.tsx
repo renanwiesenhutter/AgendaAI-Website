@@ -1050,54 +1050,56 @@ const handlePhoneChange = React.useCallback(
   // 1) State para guardar o client_secret (mantém o seu)
   const [clientSecret, setClientSecret] = React.useState<string | null>(null);
   const setupInitTimerRef = React.useRef<number | null>(null);
-  
+
   React.useEffect(() => {
     // zera o clientSecret quando trocar de plano (annual/monthly)
     setClientSecret(null);
-  
-    // Em dev (StrictMode) a 1ª montagem desmonta logo em seguida.
-    // Atrasamos a chamada para que o "desmonte fantasma" cancele a requisição.
-    const IS_DEV = typeof import.meta !== "undefined" ? !!import.meta.env.DEV : process.env.NODE_ENV !== "production";
-    const delayMs = IS_DEV ? 250 : 0; // 250ms em dev, 0ms em prod
-  
+
+    const IS_DEV =
+      typeof import.meta !== "undefined" ? !!import.meta.env.DEV : process.env.NODE_ENV !== "production";
+    const delayMs = IS_DEV ? 250 : 0;
+
     const ac = new AbortController();
-  
-    // limpa algum timer anterior (ex.: troca de plano)
+
     if (setupInitTimerRef.current) {
       clearTimeout(setupInitTimerRef.current);
       setupInitTimerRef.current = null;
     }
-  
+
     setupInitTimerRef.current = window.setTimeout(async () => {
       try {
         const base = import.meta.env.VITE_N8N_BASE || "https://n8n.dalzzen.com/webhook";
-  
+
         const res = await fetch(`${base}/billing/setup_init`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": "ZT6^HNWHJ6$dV8n5T6V7tioSzZ!W9BxHz#YZu5Si%Y8QUzd%TREEVADN@KDU@Pmz55uF!kKNMjG&g7f^nVEMxUqahCozK7%yZgFoMvis&8wf8Zvyhw&7kguxteBhqbDM",
+            "x-api-key":
+              "ZT6^HNWHJ6$dV8n5T6V7tioSzZ!W9BxHz#YZu5Si%Y8QUzd%TREEVADN@KDU@Pmz55uF!kKNMjG&g7f^nVEMxUqahCozK7%yZgFoMvis&8wf8Zvyhw&7kguxteBhqbDM",
           },
-          body: JSON.stringify({ usage: "off_session" }),
+          // ✅ envia o plano atual para o n8n
+          body: JSON.stringify({
+            usage: "off_session",
+            plan, // "annual" | "monthly"
+          }),
           signal: ac.signal,
         });
-  
+
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (ac.signal.aborted) return;
-  
+
         const cs: string | undefined = data?.client_secret;
         if (!cs) throw new Error("Resposta sem client_secret.");
-  
+
         setClientSecret(cs);
         (window as any).__CLIENT_SECRET__ = cs; // opcional para debug
       } catch (err) {
-        if (ac.signal.aborted) return; // desmontou antes de finalizar
+        if (ac.signal.aborted) return;
         console.error("[Checkout] Erro no setup_init:", err);
       }
     }, delayMs);
-  
-    // cleanup: cancela o timer e aborta fetch se o componente desmontar (StrictMode / troca de rota)
+
     return () => {
       if (setupInitTimerRef.current) {
         clearTimeout(setupInitTimerRef.current);
@@ -1105,7 +1107,7 @@ const handlePhoneChange = React.useCallback(
       }
       ac.abort();
     };
-  }, [isAnnual]);
+  }, [plan]); // 👈 depende do plano selecionado
 
   // 3) Memoiza as opções do Elements (evita re-mount)
   const elementsOptions = React.useMemo<StripeElementsOptions>(() => {
