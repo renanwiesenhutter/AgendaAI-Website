@@ -157,11 +157,23 @@ function ApplePayPRB({
 
   if (!paymentRequest || !enabled) return null;
   return (
-    <div className="w-full">
-      <PaymentRequestButtonElement options={{ paymentRequest }} />
+    <div className="w-full h-[55px] rounded-lg overflow-hidden">
+      <PaymentRequestButtonElement
+        className="w-full h-full"
+        options={{
+          paymentRequest,
+          style: {
+            paymentRequestButton: {
+              height: '55px',   // mesmo height do seu CTA
+              theme: 'dark',    // opcional: 'dark' | 'light' | 'light-outline'
+              type: 'default',  // opcional
+            },
+          },
+        }}
+      />
     </div>
   );
-}
+  }
 
 /* === 2) Mova o StripePaymentForm para FORA do CheckoutPage === */
 function StripePaymentForm({
