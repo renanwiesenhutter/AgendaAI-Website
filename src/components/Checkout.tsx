@@ -68,7 +68,7 @@ function formatBRL(cents: number) {
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK!);
 
 function ApplePayPRB({
-  enabled, name, email, phone, couponCode, onSuccess,
+  enabled, name, email, phone, couponCode, onSuccess, mode,
 }: {
   enabled: boolean;
   name: string;
@@ -76,6 +76,7 @@ function ApplePayPRB({
   phone: string;
   couponCode?: string | null;
   onSuccess: (amountCents?: number, brand?: string) => void;
+  mode: "annual" | "monthly";
 }) {
   const stripe = useStripe();
   const [paymentRequest, setPaymentRequest] = React.useState<stripeJs.PaymentRequest | null>(null);
@@ -84,31 +85,57 @@ function ApplePayPRB({
   React.useEffect(() => {
     if (!stripe || !enabled) { setPaymentRequest(null); return; }
 
-    const startDate = new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10);
+    const amountMonthly = 1990;  // R$ 19,90 (centavos)
+    const amountAnnual  = 11880; // R$ 118,80 (centavos)
+
+    const nextMonthISO = (() => {
+      const d = new Date();
+      d.setMonth(d.getMonth() + 1);
+      return d.toISOString().slice(0, 10);
+    })();
+
+    const trialStartISO = new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10);
 
     const pr = stripe.paymentRequest({
       country: "BR",
       currency: "brl",
-      total: { label: "Agenda AI – Anual", amount: 0 }, // trial: hoje R$0
+      // total mostra o que será cobrado AGORA:
+      total: mode === "annual"
+        ? { label: "Agenda AI – Anual (7 dias grátis)", amount: 0 }
+        : { label: "Agenda AI – Mensal (1º mês)",       amount: amountMonthly },
+
       requestPayerName: true,
       requestPayerEmail: true,
-      // 🔑 faz o sheet do Apple Pay mostrar “7 days free” + valor anual:
-      recurringPaymentRequest: {
-        paymentDescription: "Agenda AI – assinatura anual",
-        regularBilling: {
-          label: "Agenda AI – Anual",
-          amount: 11880,                  // R$ 118,80 em centavos
-          paymentTiming: "recurring",
-          billingInterval: "year",
-          recurringPaymentStartDate: startDate,
-        },
-        trialBilling: {
-          label: "7 days free",
-          amount: 0,
-          paymentTiming: "deferred",
-          billingInterval: "week",
-        },
-      },
+
+      // 🔑 Exibir termos de recorrência no sheet
+      recurringPaymentRequest: mode === "annual"
+        ? {
+            paymentDescription: "Agenda AI – assinatura anual",
+            regularBilling: {
+              label: "Agenda AI – Anual",
+              amount: amountAnnual,
+              paymentTiming: "recurring",
+              billingInterval: "year",
+              recurringPaymentStartDate: trialStartISO, // cobra em 7 dias
+            },
+            trialBilling: {
+              label: "7 days free",
+              amount: 0,
+              paymentTiming: "deferred",
+              billingInterval: "week",
+            },
+          }
+        : {
+            paymentDescription: "Agenda AI – assinatura mensal",
+            regularBilling: {
+              label: "Agenda AI – Mensal",
+              amount: amountMonthly,
+              paymentTiming: "recurring",
+              billingInterval: "month",
+              recurringPaymentStartDate: nextMonthISO, // próxima cobrança em ~1 mês
+            },
+            // sem trial no mensal → sem trialBilling
+          },
     });
 
     pr.canMakePayment().then((res) => {
@@ -117,7 +144,7 @@ function ApplePayPRB({
     });
 
     return () => { setPaymentRequest(null); handlerAttached.current = false; };
-  }, [stripe, enabled, name, email, phone, couponCode]);
+  }, [stripe, enabled, mode, name, email, phone, couponCode]);
 
   React.useEffect(() => {
     if (!stripe || !paymentRequest || handlerAttached.current) return;
@@ -130,32 +157,54 @@ function ApplePayPRB({
           "x-api-key": "ZT6^HNWHJ6$dV8n5T6V7tioSzZ!W9BxHz#YZu5Si%Y8QUzd%TREEVADN@KDU@Pmz55uF!kKNMjG&g7f^nVEMxUqahCozK7%yZgFoMvis&8wf8Zvyhw&7kguxteBhqbDM",
         };
 
-        // cria SetupIntent + assinatura c/ trial
-        const r = await fetch(`${base}/payment/yearly/init`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
-        });
-        const j = await r.json();
-        const cs: string | undefined = j?.client_secret;
-        if (!cs || !cs.startsWith("seti_")) { ev.complete("fail"); return; }
+        if (mode === "annual") {
+          // ANUAL → SetupIntent (trial hoje = R$0)
+          const r = await fetch(`${base}/payment/yearly/init`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
+          });
+          const j = await r.json();
+          const cs: string | undefined = j?.client_secret;
+          if (!cs || !cs.startsWith("seti_")) { ev.complete("fail"); return; }
 
-        const { error } = await stripe.confirmCardSetup(cs, {
-          payment_method: ev.paymentMethod.id,
-        });
-        if (error) { ev.complete("fail"); return; }
+          const { error } = await stripe.confirmCardSetup(cs, {
+            payment_method: ev.paymentMethod.id,
+          });
+          if (error) { ev.complete("fail"); return; }
 
-        ev.complete("success");
-        onSuccess(undefined, "DALZZEN");
+          ev.complete("success");
+          onSuccess(undefined, "DALZZEN");
+        } else {
+          // MENSAL → PaymentIntent (cobra agora o 1º mês)
+          const r = await fetch(`${base}/payment/monthly/init`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
+          });
+          const j = await r.json();
+          const cs: string | undefined = j?.client_secret;
+          if (!cs || !cs.startsWith("pi_")) { ev.complete("fail"); return; }
+
+          const pay = await stripe.confirmCardPayment(cs, {
+            payment_method: ev.paymentMethod.id,
+          });
+          if (pay.error) { ev.complete("fail"); return; }
+
+          ev.complete("success");
+          onSuccess(pay.paymentIntent?.amount, "DALZZEN");
+        }
       } catch {
         ev.complete("fail");
       }
     });
 
     handlerAttached.current = true;
-  }, [stripe, paymentRequest, name, email, phone, couponCode, onSuccess]);
+  }, [stripe, paymentRequest, mode, name, email, phone, couponCode, onSuccess]);
 
   if (!paymentRequest || !enabled) return null;
+
+  // Mantém o mesmo tamanho do teu CTA (55px)
   return (
     <div className="w-full h-[55px] rounded-lg overflow-hidden">
       <PaymentRequestButtonElement
@@ -164,16 +213,16 @@ function ApplePayPRB({
           paymentRequest,
           style: {
             paymentRequestButton: {
-              height: '55px',   // mesmo height do seu CTA
-              theme: 'dark',    // opcional: 'dark' | 'light' | 'light-outline'
-              type: 'default',  // opcional
+              height: '55px',
+              theme: 'dark',
+              type: 'default',
             },
           },
         }}
       />
     </div>
   );
-  }
+}
 
 /* === 2) Mova o StripePaymentForm para FORA do CheckoutPage === */
 function StripePaymentForm({
@@ -285,11 +334,10 @@ function StripePaymentForm({
 
       {/* ⬇️ mesmo layout do teu rodapé; só troca o conteúdo */}
       <div className="space-y-4">
-        {selectedType === "apple_pay" && mode === "annual" ? (
-          // Quando Apple Pay estiver selecionado dentro do PaymentElement,
-          // o CTA vira o botão nativo do Apple Pay (PRB), com os termos recorrentes.
+        {selectedType === "apple_pay" ? (
           <ApplePayPRB
             enabled={true}
+            mode={mode}                 // ← agora o PRB sabe se é anual ou mensal
             name={name}
             email={email}
             phone={phone}
@@ -317,12 +365,7 @@ function StripePaymentForm({
               <span className="justify-self-center">
                 {loading ? "Processando..." : mode === "annual" ? "Iniciar teste" : "Assinar"}
               </span>
-              <svg
-                aria-hidden
-                className={`justify-self-end w-5 h-5 ${loading ? "opacity-100" : "opacity-0"} transition-opacity animate-spin`}
-                viewBox="0 0 24 24"
-                fill="none"
-              >
+              <svg aria-hidden className={`justify-self-end w-5 h-5 ${loading ? "opacity-100" : "opacity-0"} transition-opacity animate-spin`} viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
                 <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
               </svg>
