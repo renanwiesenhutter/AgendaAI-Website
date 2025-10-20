@@ -68,10 +68,7 @@ function formatBRL(cents: number) {
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK!);
 
 function ApplePayPRB({
-  enabled,               // true quando plano = "annual"
-  name, email, phone,
-  couponCode,
-  onSuccess,            // mesma assinatura que você já usa
+  enabled, name, email, phone, couponCode, onSuccess,
 }: {
   enabled: boolean;
   name: string;
@@ -81,30 +78,26 @@ function ApplePayPRB({
   onSuccess: (amountCents?: number, brand?: string) => void;
 }) {
   const stripe = useStripe();
-  const elements = useElements();
   const [paymentRequest, setPaymentRequest] = React.useState<stripeJs.PaymentRequest | null>(null);
+  const handlerAttached = React.useRef(false);
 
   React.useEffect(() => {
-    if (!stripe || !enabled) return;
+    if (!stripe || !enabled) { setPaymentRequest(null); return; }
 
-    // 7 dias de trial; cobrança futura anual de 118,80
-    const startDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
+    const startDate = new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10);
 
     const pr = stripe.paymentRequest({
       country: "BR",
       currency: "brl",
-      total: { label: "Agenda AI – Anual", amount: 0 }, // hoje = R$0 (trial)
+      total: { label: "Agenda AI – Anual", amount: 0 }, // trial: hoje R$0
       requestPayerName: true,
       requestPayerEmail: true,
-
-      // 🔑 Isto é o que faz aparecer "7 days free" e o valor anual no sheet:
+      // 🔑 faz o sheet do Apple Pay mostrar “7 days free” + valor anual:
       recurringPaymentRequest: {
         paymentDescription: "Agenda AI – assinatura anual",
         regularBilling: {
           label: "Agenda AI – Anual",
-          amount: 11880,                 // R$ 118,80 (centavos)
+          amount: 11880,                  // R$ 118,80 em centavos
           paymentTiming: "recurring",
           billingInterval: "year",
           recurringPaymentStartDate: startDate,
@@ -120,42 +113,51 @@ function ApplePayPRB({
 
     pr.canMakePayment().then((res) => {
       if (res?.applePay) setPaymentRequest(pr);
+      else setPaymentRequest(null);
     });
 
-    // Quando o usuário confirma no Apple Pay
-    pr.on("paymentmethod", async (ev) => {
+    return () => { setPaymentRequest(null); handlerAttached.current = false; };
+  }, [stripe, enabled, name, email, phone, couponCode]);
+
+  React.useEffect(() => {
+    if (!stripe || !paymentRequest || handlerAttached.current) return;
+
+    paymentRequest.on("paymentmethod", async (ev) => {
       try {
-        // 1) pega um SetupIntent do seu backend (você já tem esse endpoint)
-        const r = await fetch(`${N8N_BASE}/payment/yearly/init`, {
+        const base = "https://n8n.dalzzen.com/webhook";
+        const headers = {
+          "Content-Type": "application/json",
+          "x-api-key": "ZT6^HNWHJ6$dV8n5T6V7tioSzZ!W9BxHz#YZu5Si%Y8QUzd%TREEVADN@KDU@Pmz55uF!kKNMjG&g7f^nVEMxUqahCozK7%yZgFoMvis&8wf8Zvyhw&7kguxteBhqbDM",
+        };
+
+        // cria SetupIntent + assinatura c/ trial
+        const r = await fetch(`${base}/payment/yearly/init`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "x-api-key": N8N_KEY },
+          headers,
           body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
         });
-        const { client_secret } = await r.json();
+        const j = await r.json();
+        const cs: string | undefined = j?.client_secret;
+        if (!cs || !cs.startsWith("seti_")) { ev.complete("fail"); return; }
 
-        // 2) confirma o SetupIntent com o PM do Apple Pay
-        const { error } = await stripe!.confirmCardSetup(client_secret, {
+        const { error } = await stripe.confirmCardSetup(cs, {
           payment_method: ev.paymentMethod.id,
         });
-        if (error) {
-          ev.complete("fail");
-          return;
-        }
+        if (error) { ev.complete("fail"); return; }
 
         ev.complete("success");
-
-        // 3) opcional: seu backend já pode ter criado a subscription no init.
-        // Se não, crie aqui e depois:
-        onSuccess?.(undefined, "DALZZEN");
+        onSuccess(undefined, "DALZZEN");
       } catch {
         ev.complete("fail");
       }
     });
-  }, [stripe, enabled, name, email, phone, couponCode]);
+
+    handlerAttached.current = true;
+  }, [stripe, paymentRequest, name, email, phone, couponCode, onSuccess]);
 
   if (!paymentRequest || !enabled) return null;
   return (
-    <div className="mb-4">
+    <div className="w-full">
       <PaymentRequestButtonElement options={{ paymentRequest }} />
     </div>
   );
@@ -177,11 +179,18 @@ function StripePaymentForm({
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [peComplete, setPeComplete] = React.useState(false);
 
-  const disabled = !stripe || !peComplete || !contactValid || loading;
+  // 👉 NOVO: saber o método selecionado DENTRO do PaymentElement
+  const [selectedType, setSelectedType] = React.useState<string | null>(null);
+
+  // o teu disabled original, mas só vale para cartão/PIX (quando não é apple_pay)
+  const disabled = !stripe || !contactValid || loading || (selectedType !== "apple_pay" && !peComplete);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!stripe || !elements) return;
+
+    // Se for Apple Pay, quem dispara é o botão PRB (abaixo)
+    if (selectedType === "apple_pay" && mode === "annual") return;
 
     setLoading(true);
     setErrorMsg(null);
@@ -194,34 +203,22 @@ function StripePaymentForm({
     }
 
     try {
-      // Base do n8n (use o /webhook)
       const base = "https://n8n.dalzzen.com/webhook";
-
-      // Headers fixos (você pediu para não usar .env)
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "x-api-key": "ZT6^HNWHJ6$dV8n5T6V7tioSzZ!W9BxHz#YZu5Si%Y8QUzd%TREEVADN@KDU@Pmz55uF!kKNMjG&g7f^nVEMxUqahCozK7%yZgFoMvis&8wf8Zvyhw&7kguxteBhqbDM",
       };
 
       if (mode === "annual") {
-        // ✅ ANUAL: cria/pega SetupIntent no n8n e confirma com confirmSetup
         const res = await fetch(`${base}/payment/yearly/init`, {
           method: "POST",
           headers,
-          body: JSON.stringify({
-            name,
-            email,
-            phone,
-            coupon: couponCode || undefined,
-          }),
+          body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const cs: string | undefined = data?.client_secret;
-
-        if (!cs || !cs.startsWith("seti_")) {
-          throw new Error("Esperava client_secret de SetupIntent (seti_...).");
-        }
+        if (!cs || !cs.startsWith("seti_")) throw new Error("Esperava client_secret de SetupIntent (seti_...).");
 
         const result = await stripe.confirmSetup({
           elements,
@@ -229,27 +226,17 @@ function StripePaymentForm({
           redirect: "if_required",
         });
         if (result.error) throw new Error(result.error.message || "Não foi possível processar.");
-        onSuccess(undefined, "DALZZEN"); // nada a cobrar hoje (trial)
-
+        onSuccess(undefined, "DALZZEN");
       } else {
-        // ✅ MENSAL: cria/pega PaymentIntent no n8n e confirma com confirmPayment
         const res = await fetch(`${base}/payment/monthly/init`, {
           method: "POST",
           headers,
-          body: JSON.stringify({
-            name,
-            email,
-            phone,
-            coupon: couponCode || undefined,
-          }),
+          body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const cs: string | undefined = data?.client_secret;
-
-        if (!cs || !cs.startsWith("pi_")) {
-          throw new Error("Esperava client_secret de PaymentIntent (pi_...).");
-        }
+        if (!cs || !cs.startsWith("pi_")) throw new Error("Esperava client_secret de PaymentIntent (pi_...).");
 
         const pay = await stripe.confirmPayment({
           elements,
@@ -267,84 +254,76 @@ function StripePaymentForm({
   }
 
   return (
-  <form onSubmit={onSubmit} className="rounded-lg p-0 space-y-6">
-    <ApplePayPRB
-      enabled={mode === "annual"}
-      name={name}
-      email={email}
-      phone={phone}
-      couponCode={couponCode ?? null}
-      onSuccess={onSuccess}
-    />
-    <PaymentElement
-      options={{
-        layout: { 
-          type: "accordion",
-          defaultCollapsed: false,
-          radios: false,
-          spacedAccordionItems: false,
-        },
-        wallets: {
-          applePay: 'never',
-          googlePay: 'auto'
-        },
-        terms: {
-          card: 'never',
-          googlePay: 'never',
-          applePay: 'never'
-        },
-      }}
-      onChange={(e) => setPeComplete(e.complete)}
-    />
-  
-    {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}
-  
-    {/* ⬇️ agrupa botão + aviso e controla o gap aqui */}
-    <div className="space-y-4"> 
-    <button
-      type="submit"
-      disabled={disabled}
-      aria-disabled={disabled}
-      aria-busy={loading || undefined}
-      className={[
-        "w-full h-[55px] text-white font-medium rounded-lg transition-all",
-        mode === "annual"
-          ? "bg-gradient-to-r from-blue-500 to-green-600"
-          : "bg-blue-600",
-        disabled
-          ? "opacity-50 cursor-not-allowed pointer-events-none"
-          : mode === "annual"
-            ? "hover:opacity-90"
-            : "hover:bg-blue-700"
-      ].join(" ")}
-    >
-      <span className="grid grid-cols-[1.25rem_1fr_1.25rem] items-center px-6">
-        {/* Fantasma (reserva espaço) */}
-        <span aria-hidden className="w-5 h-5" />
-    
-        {/* Texto */}
-        <span className="justify-self-center">
-          {loading ? "Processando..." : (mode === "annual" ? "Iniciar teste" : "Assinar")}
-        </span>
-    
-        {/* Spinner */}
-        <svg
-          aria-hidden
-          className={`justify-self-end w-5 h-5 ${loading ? "opacity-100" : "opacity-0"} transition-opacity animate-spin`}
-          viewBox="0 0 24 24" fill="none"
-        >
-          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
-          <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        </svg>
-      </span>
-    </button>
-  
-      <p className="text-[13px] text-gray-500 text-center">
-        Ao confirmar a inscrição, o senhor concede permissão à Dalzzen para efetuar 
-        cobranças conforme as condições estipuladas, até que ocorra o cancelamento.
-      </p>
-    </div>
-  </form>
+    <form onSubmit={onSubmit} className="rounded-lg p-0 space-y-6">
+      {/* PaymentElement continua igual, com Apple Pay AUTOMÁTICO */}
+      <PaymentElement
+        options={{
+          layout: { type: "accordion", defaultCollapsed: false, radios: false, spacedAccordionItems: false },
+          wallets: { applePay: "auto", googlePay: "auto" },
+          terms: { card: "never", googlePay: "never", applePay: "never" },
+        }}
+        onChange={(e: any) => {
+          setPeComplete(e.complete);
+          // e.value?.type retorna 'card', 'apple_pay', 'link', etc.
+          if (e?.value?.type) setSelectedType(e.value.type);
+        }}
+      />
+
+      {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}
+
+      {/* ⬇️ mesmo layout do teu rodapé; só troca o conteúdo */}
+      <div className="space-y-4">
+        {selectedType === "apple_pay" && mode === "annual" ? (
+          // Quando Apple Pay estiver selecionado dentro do PaymentElement,
+          // o CTA vira o botão nativo do Apple Pay (PRB), com os termos recorrentes.
+          <ApplePayPRB
+            enabled={true}
+            name={name}
+            email={email}
+            phone={phone}
+            couponCode={couponCode ?? null}
+            onSuccess={onSuccess}
+          />
+        ) : (
+          <button
+            type="submit"
+            disabled={disabled}
+            aria-disabled={disabled}
+            aria-busy={loading || undefined}
+            className={[
+              "w-full h-[55px] text-white font-medium rounded-lg transition-all",
+              mode === "annual" ? "bg-gradient-to-r from-blue-500 to-green-600" : "bg-blue-600",
+              disabled
+                ? "opacity-50 cursor-not-allowed pointer-events-none"
+                : mode === "annual"
+                ? "hover:opacity-90"
+                : "hover:bg-blue-700",
+            ].join(" ")}
+          >
+            <span className="grid grid-cols-[1.25rem_1fr_1.25rem] items-center px-6">
+              <span aria-hidden className="w-5 h-5" />
+              <span className="justify-self-center">
+                {loading ? "Processando..." : mode === "annual" ? "Iniciar teste" : "Assinar"}
+              </span>
+              <svg
+                aria-hidden
+                className={`justify-self-end w-5 h-5 ${loading ? "opacity-100" : "opacity-0"} transition-opacity animate-spin`}
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+            </span>
+          </button>
+        )}
+
+        <p className="text-[13px] text-gray-500 text-center">
+          Ao confirmar a inscrição, o senhor concede permissão à Dalzzen para
+          efetuar cobranças conforme as condições estipuladas, até que ocorra o cancelamento.
+        </p>
+      </div>
+    </form>
   );
 }
 
