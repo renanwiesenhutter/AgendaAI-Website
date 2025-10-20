@@ -69,6 +69,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK!);
 
 function ApplePayPRB({
   enabled, name, email, phone, couponCode, onSuccess, mode,
+  nowAmountCents, recurringAmountCents,
 }: {
   enabled: boolean;
   name: string;
@@ -77,6 +78,8 @@ function ApplePayPRB({
   couponCode?: string | null;
   onSuccess: (amountCents?: number, brand?: string) => void;
   mode: "annual" | "monthly";
+  nowAmountCents: number;
+  recurringAmountCents: number;
 }) {
   const stripe = useStripe();
   const [paymentRequest, setPaymentRequest] = React.useState<stripeJs.PaymentRequest | null>(null);
@@ -84,9 +87,6 @@ function ApplePayPRB({
 
   React.useEffect(() => {
     if (!stripe || !enabled) { setPaymentRequest(null); return; }
-
-    const amountMonthly = 1990;  // R$ 19,90 (centavos)
-    const amountAnnual  = 11880; // R$ 118,80 (centavos)
 
     const nextMonthISO = (() => {
       const d = new Date();
@@ -99,13 +99,11 @@ function ApplePayPRB({
     const pr = stripe.paymentRequest({
       country: "BR",
       currency: "brl",
-      // total mostra o que será cobrado AGORA:
-      total: mode === "annual"
-        ? { label: "Agenda AI – Anual (7 dias grátis)", amount: 0 }
-        : { label: "Agenda AI – Mensal (1º mês)",       amount: amountMonthly },
-
-      requestPayerName: true,
-      requestPayerEmail: true,
+        // total = quanto cobra AGORA (já com cupom)
+        total: {
+          label: mode === "annual" ? "Agenda AI – Anual" : "Agenda AI – Mensal",
+          amount: nowAmountCents,
+      },
 
       // 🔑 Exibir termos de recorrência no sheet
       recurringPaymentRequest: mode === "annual"
@@ -113,7 +111,7 @@ function ApplePayPRB({
             paymentDescription: "Agenda AI – assinatura anual",
             regularBilling: {
               label: "Agenda AI – Anual",
-              amount: amountAnnual,
+              amount: recurringAmountCents,
               paymentTiming: "recurring",
               billingInterval: "year",
               recurringPaymentStartDate: trialStartISO, // cobra em 7 dias
@@ -129,7 +127,7 @@ function ApplePayPRB({
             paymentDescription: "Agenda AI – assinatura mensal",
             regularBilling: {
               label: "Agenda AI – Mensal",
-              amount: amountMonthly,
+              amount: recurringAmountCents,
               paymentTiming: "recurring",
               billingInterval: "month",
               recurringPaymentStartDate: nextMonthISO, // próxima cobrança em ~1 mês
@@ -144,7 +142,7 @@ function ApplePayPRB({
     });
 
     return () => { setPaymentRequest(null); handlerAttached.current = false; };
-  }, [stripe, enabled, mode, name, email, phone, couponCode]);
+  }, [stripe, enabled, mode, name, email, phone, couponCode, nowAmountCents, recurringAmountCents]);
 
   React.useEffect(() => {
     if (!stripe || !paymentRequest || handlerAttached.current) return;
@@ -227,12 +225,15 @@ function ApplePayPRB({
 /* === 2) Mova o StripePaymentForm para FORA do CheckoutPage === */
 function StripePaymentForm({
   contactValid, name, email, phone, onSuccess, couponCode,
+  nowAmountCents, recurringAmountCents,
   mode, // "annual" | "monthly"
 }: {
   contactValid: boolean; name: string; email: string; phone: string;
   onSuccess: (amountCents?: number, brand?: string) => void;
   couponCode?: string | null;
   mode: "annual" | "monthly";
+  nowAmountCents: number;          // cobra AGORA (0 no anual)
+  recurringAmountCents: number;    // valor recorrente
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -360,6 +361,8 @@ function StripePaymentForm({
               phone={phone}
               couponCode={couponCode ?? null}
               onSuccess={onSuccess}
+              nowAmountCents={nowAmountCents}
+              recurringAmountCents={recurringAmountCents}
             />
           </div>
         ) : (
@@ -1360,6 +1363,14 @@ const handlePhoneChange = React.useCallback(
   }, [applied, FULL_PRICE]);
 
   const subtotalAfterCents = Math.max(FULL_PRICE - discountValueCents, 0);
+
+const nowAmountCents =
+  isAnnual ? 0 : subtotalAfterCents;
+
+const recurringAmountCents =
+  isAnnual
+    ? subtotalAfterCents
+    : subtotalAfterCents; // <- se for só 1º mês, use FULL_PRICE aqui
 
 // --- dentro do seu componente CheckoutPage ---
 const exitFiredRef = React.useRef(false);
@@ -2392,9 +2403,11 @@ React.useEffect(() => {
                           name={name}
                           email={email}
                           phone={phone}
-                          onSuccess={(amt, br) => startSuccessTransition(amt, br)}
+                          onSuccess={startSuccessTransition}
                           couponCode={applied?.code ?? null}
                           mode={isAnnual ? "annual" : "monthly"}
+                          nowAmountCents={nowAmountCents}
+                          recurringAmountCents={recurringAmountCents}
                         />
                       </Elements>
                     ) : (
