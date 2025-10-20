@@ -335,15 +335,38 @@ function StripePaymentForm({
       {/* ⬇️ mesmo layout do teu rodapé; só troca o conteúdo */}
       <div className="space-y-4">
         {selectedType === "apple_pay" ? (
-          <ApplePayPRB
-            enabled={true}
-            mode={mode}                 // ← agora o PRB sabe se é anual ou mensal
-            name={name}
-            email={email}
-            phone={phone}
-            couponCode={couponCode ?? null}
-            onSuccess={onSuccess}
-          />
+          <div
+            className={`relative ${!contactValid ? "opacity-50" : ""}`}
+            aria-disabled={!contactValid}
+          >
+            {/* Overlay que bloqueia clique/toque quando inválido */}
+            {!contactValid && (
+              <div
+                className="absolute inset-0 z-10 cursor-not-allowed"
+                onClick={(e) => {
+                  e.preventDefault(); e.stopPropagation();
+                  setErrorMsg("Preencha nome, e-mail e telefone para continuar.");
+                }}
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                role="presentation"
+                aria-hidden="true"
+              />
+            )}
+
+            {/* PRB: visual sempre presente; interação bloqueada quando inválido */}
+            <div className={!contactValid ? "pointer-events-none" : ""}>
+              <ApplePayPRB
+                enabled={true}
+                mode={mode}                // "annual" ou "monthly"
+                name={name}
+                email={email}
+                phone={phone}
+                couponCode={couponCode ?? null}
+                onSuccess={onSuccess}
+              />
+            </div>
+          </div>
         ) : (
           <button
             type="submit"
