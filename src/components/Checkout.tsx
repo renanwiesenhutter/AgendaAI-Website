@@ -336,7 +336,7 @@ function StripePaymentForm({
       <div className="space-y-4">
         {selectedType === "apple_pay" ? (
           <div
-            className={`relative ${!contactValid ? "opacity-50" : ""}`}
+            className={`relative ${!contactValid ? "opacity-70" : ""}`}
             aria-disabled={!contactValid}
           >
             {/* Overlay transparente: bloqueia qualquer clique/toque sem mostrar texto */}
@@ -372,7 +372,7 @@ function StripePaymentForm({
               "w-full h-[55px] text-white font-medium rounded-lg transition-all",
               mode === "annual" ? "bg-gradient-to-r from-blue-500 to-green-600" : "bg-blue-600",
               disabled
-                ? "opacity-50 cursor-not-allowed pointer-events-none"
+                ? "opacity-70 cursor-not-allowed pointer-events-none"
                 : mode === "annual"
                 ? "hover:opacity-90"
                 : "hover:bg-blue-700",
