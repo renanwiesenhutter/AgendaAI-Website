@@ -3,7 +3,7 @@ import { Calendar, CreditCard, Mail, UserRound, Smartphone, Lock, ChevronDown, T
 import { useSearchParams, useLocation } from "react-router-dom";
 import type { StripeElementsOptions } from '@stripe/stripe-js';
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import { Elements, PaymentElement, useElements, useStripe, PaymentRequestButtonElement } from "@stripe/react-stripe-js";
 import clsx from "clsx";
 
 <style>{`
@@ -66,6 +66,100 @@ function formatBRL(cents: number) {
 
 /* === 1) Deixe o stripePromise ESTÁVEL no escopo de módulo === */
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK!);
+
+function ApplePayPRB({
+  enabled,               // true quando plano = "annual"
+  name, email, phone,
+  couponCode,
+  onSuccess,            // mesma assinatura que você já usa
+}: {
+  enabled: boolean;
+  name: string;
+  email: string;
+  phone: string;
+  couponCode?: string | null;
+  onSuccess: (amountCents?: number, brand?: string) => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [paymentRequest, setPaymentRequest] = React.useState<stripeJs.PaymentRequest | null>(null);
+
+  React.useEffect(() => {
+    if (!stripe || !enabled) return;
+
+    // 7 dias de trial; cobrança futura anual de 118,80
+    const startDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const pr = stripe.paymentRequest({
+      country: "BR",
+      currency: "brl",
+      total: { label: "Agenda AI – Anual", amount: 0 }, // hoje = R$0 (trial)
+      requestPayerName: true,
+      requestPayerEmail: true,
+
+      // 🔑 Isto é o que faz aparecer "7 days free" e o valor anual no sheet:
+      recurringPaymentRequest: {
+        paymentDescription: "Agenda AI – assinatura anual",
+        regularBilling: {
+          label: "Agenda AI – Anual",
+          amount: 11880,                 // R$ 118,80 (centavos)
+          paymentTiming: "recurring",
+          billingInterval: "year",
+          recurringPaymentStartDate: startDate,
+        },
+        trialBilling: {
+          label: "7 days free",
+          amount: 0,
+          paymentTiming: "deferred",
+          billingInterval: "week",
+        },
+      },
+    });
+
+    pr.canMakePayment().then((res) => {
+      if (res?.applePay) setPaymentRequest(pr);
+    });
+
+    // Quando o usuário confirma no Apple Pay
+    pr.on("paymentmethod", async (ev) => {
+      try {
+        // 1) pega um SetupIntent do seu backend (você já tem esse endpoint)
+        const r = await fetch(`${N8N_BASE}/payment/yearly/init`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": N8N_KEY },
+          body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
+        });
+        const { client_secret } = await r.json();
+
+        // 2) confirma o SetupIntent com o PM do Apple Pay
+        const { error } = await stripe!.confirmCardSetup(client_secret, {
+          payment_method: ev.paymentMethod.id,
+        });
+        if (error) {
+          ev.complete("fail");
+          return;
+        }
+
+        ev.complete("success");
+
+        // 3) opcional: seu backend já pode ter criado a subscription no init.
+        // Se não, crie aqui e depois:
+        onSuccess?.(undefined, "DALZZEN");
+      } catch {
+        ev.complete("fail");
+      }
+    });
+  }, [stripe, enabled, name, email, phone, couponCode]);
+
+  if (!paymentRequest || !enabled) return null;
+  return (
+    <div className="mb-4">
+      <PaymentRequestButtonElement options={{ paymentRequest }} />
+    </div>
+  );
+}
 
 /* === 2) Mova o StripePaymentForm para FORA do CheckoutPage === */
 function StripePaymentForm({
@@ -174,6 +268,14 @@ function StripePaymentForm({
 
   return (
   <form onSubmit={onSubmit} className="rounded-lg p-0 space-y-6">
+    <ApplePayPRB
+      enabled={mode === "annual"}
+      name={name}
+      email={email}
+      phone={phone}
+      couponCode={couponCode ?? null}
+      onSuccess={onSuccess}
+    />
     <PaymentElement
       options={{
         layout: { 
@@ -183,7 +285,7 @@ function StripePaymentForm({
           spacedAccordionItems: false,
         },
         wallets: {
-          applePay: 'auto',
+          applePay: 'never',
           googlePay: 'auto'
         },
         terms: {
