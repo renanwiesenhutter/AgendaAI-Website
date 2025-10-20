@@ -339,33 +339,28 @@ function StripePaymentForm({
             className={`relative ${!contactValid ? "opacity-50" : ""}`}
             aria-disabled={!contactValid}
           >
-            {/* Overlay que bloqueia clique/toque quando inválido */}
+            {/* Overlay transparente: bloqueia qualquer clique/toque sem mostrar texto */}
             {!contactValid && (
               <div
                 className="absolute inset-0 z-10 cursor-not-allowed"
-                onClick={(e) => {
-                  e.preventDefault(); e.stopPropagation();
-                  setErrorMsg("Preencha nome, e-mail e telefone para continuar.");
-                }}
-                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 role="presentation"
                 aria-hidden="true"
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
               />
             )}
 
-            {/* PRB: visual sempre presente; interação bloqueada quando inválido */}
-            <div className={!contactValid ? "pointer-events-none" : ""}>
-              <ApplePayPRB
-                enabled={true}
-                mode={mode}                // "annual" ou "monthly"
-                name={name}
-                email={email}
-                phone={phone}
-                couponCode={couponCode ?? null}
-                onSuccess={onSuccess}
-              />
-            </div>
+            {/* Botão Apple Pay (PRB) – sempre visível */}
+            <ApplePayPRB
+              enabled={true}
+              mode={mode}                // "annual" ou "monthly"
+              name={name}
+              email={email}
+              phone={phone}
+              couponCode={couponCode ?? null}
+              onSuccess={onSuccess}
+            />
           </div>
         ) : (
           <button
