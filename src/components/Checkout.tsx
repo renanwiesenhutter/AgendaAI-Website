@@ -82,11 +82,19 @@ function WalletPRB({
   recurringAmountCents: number;
 }) {
   const stripe = useStripe();
+
+  // Mantém a MESMA instância do PaymentRequest
+  const prRef = React.useRef<any>(null);
   const [paymentRequest, setPaymentRequest] = React.useState<any>(null);
   const handlerAttached = React.useRef(false);
 
+  // Cria o PRB só quando Stripe/enable/mode mudarem (NÃO em cada tecla)
   React.useEffect(() => {
-    if (!stripe || !enabled) { setPaymentRequest(null); return; }
+    if (!stripe || !enabled) return;
+
+    // Se o plano mudou, derruba a instância para recriar
+    prRef.current = null;
+    setPaymentRequest(null);
 
     const nextMonthISO = (() => {
       const d = new Date(); d.setMonth(d.getMonth() + 1);
@@ -101,12 +109,9 @@ function WalletPRB({
         label: mode === "annual" ? "Agenda AI – Anual" : "Agenda AI – Mensal",
         amount: nowAmountCents,
       },
-      // opcional: pedir contatos
       requestPayerName: true,
       requestPayerEmail: true,
       requestPayerPhone: true,
-
-      // Recorrência + trial (Stripe mostra no sheet do Apple/Google)
       recurringPaymentRequest: mode === "annual"
         ? {
             paymentDescription: "Agenda AI – assinatura anual",
@@ -137,85 +142,94 @@ function WalletPRB({
     });
 
     pr.canMakePayment().then((res) => {
-      // ✅ habilita o PRB se tiver Apple Pay OU Google Pay disponível
-      if (res?.applePay || res?.googlePay) setPaymentRequest(pr);
-      else setPaymentRequest(null);
-    });
-
-    return () => { setPaymentRequest(null); handlerAttached.current = false; };
-  }, [stripe, enabled, mode, name, email, phone, couponCode, nowAmountCents, recurringAmountCents]);
-
-  React.useEffect(() => {
-    if (!stripe || !paymentRequest || handlerAttached.current) return;
-
-    paymentRequest.on("paymentmethod", async (ev) => {
-      try {
-        const base = "https://n8n.dalzzen.com/webhook";
-        const headers = {
-          "Content-Type": "application/json",
-          "x-api-key": "ZT6^HNWHJ6$dV8n5T6V7tioSzZ!W9BxHz#YZu5Si%Y8QUzd%TREEVADN@KDU@Pmz55uF!kKNMjG&g7f^nVEMxUqahCozK7%yZgFoMvis&8wf8Zvyhw&7kguxteBhqbDM",
-        };
-
-        if (mode === "annual") {
-          // Trial hoje (R$ 0) → SetupIntent
-          const r = await fetch(`${base}/payment/yearly/init`, {
-            method: "POST", headers,
-            body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
-          });
-          const j = await r.json();
-          const cs: string | undefined = j?.client_secret;
-          if (!cs || !cs.startsWith("seti_")) { ev.complete("fail"); return; }
-
-          const { error } = await stripe.confirmCardSetup(cs, {
-            payment_method: ev.paymentMethod.id,
-          });
-          if (error) { ev.complete("fail"); return; }
-
-          ev.complete("success");
-          onSuccess(undefined, "DALZZEN");
-        } else {
-          // Cobra agora → PaymentIntent
-          const r = await fetch(`${base}/payment/monthly/init`, {
-            method: "POST", headers,
-            body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
-          });
-          const j = await r.json();
-          const cs: string | undefined = j?.client_secret;
-          if (!cs || !cs.startsWith("pi_")) { ev.complete("fail"); return; }
-
-          const pay = await stripe.confirmCardPayment(cs, {
-            payment_method: ev.paymentMethod.id,
-          });
-          if (pay.error) { ev.complete("fail"); return; }
-
-          ev.complete("success");
-          onSuccess(pay.paymentIntent?.amount, "DALZZEN");
-        }
-      } catch {
-        ev.complete("fail");
+      if (res?.applePay || res?.googlePay) {
+        prRef.current = pr;
+        setPaymentRequest(pr);
+      } else {
+        setPaymentRequest(null);
       }
     });
 
-    handlerAttached.current = true;
-  }, [stripe, paymentRequest, mode, name, email, phone, couponCode, onSuccess]);
+    // Anexa o handler UMA vez por instância
+    if (!handlerAttached.current) {
+      pr.on("paymentmethod", async (ev: any) => {
+        try {
+          const base = "https://n8n.dalzzen.com/webhook";
+          const headers = {
+            "Content-Type": "application/json",
+            "x-api-key": "ZT6^HNWHJ6$dV8n5T6V7tioSzZ!W9BxHz#YZu5Si%Y8QUzd%TREEVADN@KDU@Pmz55uF!kKNMjG&g7f^nVEMxUqahCozK7%yZgFoMvis&8wf8Zvyhw&7kguxteBhqbDM",
+          };
+
+          if (mode === "annual") {
+            const r = await fetch(`${base}/payment/yearly/init`, {
+              method: "POST", headers,
+              body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
+            });
+            const j = await r.json();
+            const cs: string | undefined = j?.client_secret;
+            if (!cs || !cs.startsWith("seti_")) { ev.complete("fail"); return; }
+
+            const { error } = await stripe!.confirmCardSetup(cs, {
+              payment_method: ev.paymentMethod.id,
+            });
+            if (error) { ev.complete("fail"); return; }
+
+            ev.complete("success");
+            onSuccess(undefined, "DALZZEN");
+          } else {
+            const r = await fetch(`${base}/payment/monthly/init`, {
+              method: "POST", headers,
+              body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
+            });
+            const j = await r.json();
+            const cs: string | undefined = j?.client_secret;
+            if (!cs || !cs.startsWith("pi_")) { ev.complete("fail"); return; }
+
+            const pay = await stripe!.confirmCardPayment(cs, {
+              payment_method: ev.paymentMethod.id,
+            });
+            if (pay.error) { ev.complete("fail"); return; }
+
+            ev.complete("success");
+            onSuccess(pay.paymentIntent?.amount, "DALZZEN");
+          }
+        } catch {
+          ev.complete("fail");
+        }
+      });
+      handlerAttached.current = true;
+    }
+  }, [stripe, enabled, mode]); // 👈 sem name/email/phone/a cada tecla
+
+  // Se valores mudarem, atualize sem recriar o PR
+  React.useEffect(() => {
+    if (!prRef.current) return;
+    prRef.current.update?.({
+      total: {
+        label: mode === "annual" ? "Agenda AI – Anual" : "Agenda AI – Mensal",
+        amount: nowAmountCents,
+      },
+      // displayItems também podem ser atualizados se você usar
+    });
+  }, [nowAmountCents, mode]);
+
+  // Memoriza as options para não trocar identidade a cada render
+  const prbOptions = React.useMemo(() => ({
+    paymentRequest,
+    style: {
+      paymentRequestButton: {
+        height: "55px",
+        theme: "dark",
+        type: "default",
+      },
+    },
+  }), [paymentRequest]);
 
   if (!paymentRequest || !enabled) return null;
 
   return (
     <div className="w-full h-[55px] rounded-lg overflow-hidden">
-      <PaymentRequestButtonElement
-        className="w-full h-full"
-        options={{
-          paymentRequest,
-          style: {
-            paymentRequestButton: {
-              height: "55px",
-              theme: "dark",
-              type: "default",
-            },
-          },
-        }}
-      />
+      <PaymentRequestButtonElement className="w-full h-full" options={prbOptions} />
     </div>
   );
 }
