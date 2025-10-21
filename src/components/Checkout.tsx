@@ -67,7 +67,7 @@ function formatBRL(cents: number) {
 /* === 1) Deixe o stripePromise ESTÁVEL no escopo de módulo === */
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK!);
 
-function ApplePayPRB({
+function WalletPRB({
   enabled, name, email, phone, couponCode, onSuccess, mode,
   nowAmountCents, recurringAmountCents,
 }: {
@@ -82,30 +82,31 @@ function ApplePayPRB({
   recurringAmountCents: number;
 }) {
   const stripe = useStripe();
-  const [paymentRequest, setPaymentRequest] = React.useState<stripeJs.PaymentRequest | null>(null);
+  const [paymentRequest, setPaymentRequest] = React.useState<any>(null);
   const handlerAttached = React.useRef(false);
 
   React.useEffect(() => {
     if (!stripe || !enabled) { setPaymentRequest(null); return; }
 
     const nextMonthISO = (() => {
-      const d = new Date();
-      d.setMonth(d.getMonth() + 1);
+      const d = new Date(); d.setMonth(d.getMonth() + 1);
       return d.toISOString().slice(0, 10);
     })();
-
     const trialStartISO = new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10);
 
     const pr = stripe.paymentRequest({
       country: "BR",
       currency: "brl",
-        // total = quanto cobra AGORA (já com cupom)
-        total: {
-          label: mode === "annual" ? "Agenda AI – Anual" : "Agenda AI – Mensal",
-          amount: nowAmountCents,
+      total: {
+        label: mode === "annual" ? "Agenda AI – Anual" : "Agenda AI – Mensal",
+        amount: nowAmountCents,
       },
+      // opcional: pedir contatos
+      requestPayerName: true,
+      requestPayerEmail: true,
+      requestPayerPhone: true,
 
-      // 🔑 Exibir termos de recorrência no sheet
+      // Recorrência + trial (Stripe mostra no sheet do Apple/Google)
       recurringPaymentRequest: mode === "annual"
         ? {
             paymentDescription: "Agenda AI – assinatura anual",
@@ -114,10 +115,10 @@ function ApplePayPRB({
               amount: recurringAmountCents,
               paymentTiming: "recurring",
               billingInterval: "year",
-              recurringPaymentStartDate: trialStartISO, // cobra em 7 dias
+              recurringPaymentStartDate: trialStartISO,
             },
             trialBilling: {
-              label: "7 days free",
+              label: "7 dias grátis",
               amount: 0,
               paymentTiming: "deferred",
               billingInterval: "week",
@@ -130,14 +131,14 @@ function ApplePayPRB({
               amount: recurringAmountCents,
               paymentTiming: "recurring",
               billingInterval: "month",
-              recurringPaymentStartDate: nextMonthISO, // próxima cobrança em ~1 mês
+              recurringPaymentStartDate: nextMonthISO,
             },
-            // sem trial no mensal → sem trialBilling
           },
     });
 
     pr.canMakePayment().then((res) => {
-      if (res?.applePay) setPaymentRequest(pr);
+      // ✅ habilita o PRB se tiver Apple Pay OU Google Pay disponível
+      if (res?.applePay || res?.googlePay) setPaymentRequest(pr);
       else setPaymentRequest(null);
     });
 
@@ -156,10 +157,9 @@ function ApplePayPRB({
         };
 
         if (mode === "annual") {
-          // ANUAL → SetupIntent (trial hoje = R$0)
+          // Trial hoje (R$ 0) → SetupIntent
           const r = await fetch(`${base}/payment/yearly/init`, {
-            method: "POST",
-            headers,
+            method: "POST", headers,
             body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
           });
           const j = await r.json();
@@ -174,10 +174,9 @@ function ApplePayPRB({
           ev.complete("success");
           onSuccess(undefined, "DALZZEN");
         } else {
-          // MENSAL → PaymentIntent (cobra agora o 1º mês)
+          // Cobra agora → PaymentIntent
           const r = await fetch(`${base}/payment/monthly/init`, {
-            method: "POST",
-            headers,
+            method: "POST", headers,
             body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
           });
           const j = await r.json();
@@ -202,7 +201,6 @@ function ApplePayPRB({
 
   if (!paymentRequest || !enabled) return null;
 
-  // Mantém o mesmo tamanho do teu CTA (55px)
   return (
     <div className="w-full h-[55px] rounded-lg overflow-hidden">
       <PaymentRequestButtonElement
@@ -211,9 +209,9 @@ function ApplePayPRB({
           paymentRequest,
           style: {
             paymentRequestButton: {
-              height: '55px',
-              theme: 'dark',
-              type: 'default',
+              height: "55px",
+              theme: "dark",
+              type: "default",
             },
           },
         }}
@@ -252,7 +250,9 @@ function StripePaymentForm({
     if (!stripe || !elements) return;
 
     // Se for Apple Pay, quem dispara é o botão PRB (abaixo)
-    if (selectedType === "apple_pay" && mode === "annual") return;
+    if ((selectedType === "apple_pay" || selectedType === "google_pay") && mode === "annual") {
+      return; // quem confirma é o PRB
+    }
 
     setLoading(true);
     setErrorMsg(null);
@@ -335,27 +335,14 @@ function StripePaymentForm({
 
       {/* ⬇️ mesmo layout do teu rodapé; só troca o conteúdo */}
       <div className="space-y-4">
-        {selectedType === "apple_pay" ? (
-          <div
-            className={`relative ${!contactValid ? "opacity-70" : ""}`}
-            aria-disabled={!contactValid}
-          >
-            {/* Overlay transparente: bloqueia qualquer clique/toque sem mostrar texto */}
+        {(selectedType === "apple_pay" || selectedType === "google_pay") ? (
+          <div className={`relative ${!contactValid ? "opacity-70" : ""}`} aria-disabled={!contactValid}>
             {!contactValid && (
-              <div
-                className="absolute inset-0 z-10 cursor-not-allowed"
-                role="presentation"
-                aria-hidden="true"
-                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-              />
+              <div className="absolute inset-0 z-10 cursor-not-allowed" role="presentation" aria-hidden="true" />
             )}
-
-            {/* Botão Apple Pay (PRB) – sempre visível */}
-            <ApplePayPRB
+            <WalletPRB
               enabled={true}
-              mode={mode}                // "annual" ou "monthly"
+              mode={mode}
               name={name}
               email={email}
               phone={phone}
