@@ -131,60 +131,91 @@ function WalletPRB({
 
   // cria o PRB só quando Stripe/enable/mode mudarem (NÃO em cada tecla/campo)
   React.useEffect(() => {
-    if (!stripe || !enabled) { setPaymentRequest(null); prRef.current = null; handlerAttached.current = false; return; }
+    if (!stripe || !enabled) {
+      setPaymentRequest(null);
+      prRef.current = null;
+      handlerAttached.current = false;
+      return;
+    }
 
-    // ao trocar o plano, zere instância anterior
-    prRef.current = null;
-    setPaymentRequest(null);
-    handlerAttached.current = false;
+    // datas para o trial do anual
+    const now = new Date();
+    const TRIAL_DAYS = 7;
+    const startAfterTrial = new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
 
-    const nextMonthISO = (() => {
-      const d = new Date(); d.setMonth(d.getMonth() + 1);
-      return d.toISOString().slice(0, 10);
-    })();
-    const trialStartISO = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
+    // Apple Pay: detalhes de assinatura têm que estar dentro de applePay.recurringPaymentRequest
     const pr = stripe.paymentRequest({
       country: "BR",
       currency: "brl",
+
+      applePay:
+        mode === "annual"
+          ? {
+              recurringPaymentRequest: {
+                paymentDescription: "Agenda AI - Assinatura Anual",
+                managementURL: "https://agendaai.dalzzen.com/assinaturas",
+
+                // 🔹 Termos Legais (texto no topo)
+                termsAndConditions: {
+                  label: "Detalhes da Cobrança",
+                  text:
+                    "Ao confirmar a inscrição, o senhor concede permissão à Dalzzen para efetuar cobranças conforme as condições estipuladas, até que ocorra o cancelamento.",
+                },
+
+                // 🔹 trial mostrado como "7 dias grátis" no sheet
+                trialBilling: {
+                  label: "7 dias grátis",
+                  amount: 0,                               // sem cobrança no trial
+                  startDate: now.toISOString(),            // começa agora
+                  endDate: startAfterTrial.toISOString(),  // termina em 7 dias
+                },
+
+                // 🔹 ciclo regular mostrado com "A partir de <data>"
+                regularBilling: {
+                  label: "Agenda AI",
+                  amount: recurringAmountCents,            // 11880 (ou com cupom)
+                  recurringPaymentStartDate: startAfterTrial.toISOString(),// <- gera "A partir de (data)"
+                  recurringPaymentIntervalUnit: "year",
+                  recurringPaymentIntervalCount: 1,
+                },
+              },
+            }
+          : {
+              // ======== MENSAL (sem teste grátis) ========
+              recurringPaymentRequest: {
+                paymentDescription: "Agenda AI - Assinatura Mensal",
+                managementURL: "https://agendaai.dalzzen.com/assinaturas",
+
+                // 🔹 Termos Legais (texto no topo)
+                termsAndConditions: {
+                  label: "Detalhes da Cobrança",
+                  text:
+                    "Ao confirmar a inscrição, o senhor concede permissão à Dalzzen para efetuar cobranças mensais conforme as condições estipuladas, até que ocorra o cancelamento.",
+                },
+
+                // ❌ Sem trialBilling no mensal
+
+                // 🔹 cobrança recorrente começando agora
+                regularBilling: {
+                  label: "Agenda AI",
+                  amount: recurringAmountCents,            // 1990, por ex. (já com cupom se houver)
+                  recurringPaymentStartDate: now.toISOString(),            // gera “Começando agora”
+                  recurringPaymentIntervalUnit: "month",
+                  recurringPaymentIntervalCount: 1,
+                },
+              },
+            },
+
+      // Valor devido AGORA
       total: {
-        label: mode === "annual" ? "Agenda AI – Anual" : "Agenda AI – Mensal",
-        amount: nowAmountCents,
+        label: mode === "annual" ? "Agenda AI" : "Agenda AI",
+        amount: nowAmountCents, // anual: 0; mensal: 1990 (ex.)
       },
-      // Se quiser coletar pelo sheet da carteira, mude para true:
+
+      // displayItems são ignorados em recorrência
       requestPayerName: false,
       requestPayerEmail: false,
-      requestPayerPhone: false,
-
-      // Tipagem do pacote pode não ter esse campo ainda → usamos 'as any' no objeto inteiro
-      recurringPaymentRequest: mode === "annual"
-        ? {
-            paymentDescription: "Agenda AI – assinatura anual",
-            regularBilling: {
-              label: "Agenda AI – Anual",
-              amount: recurringAmountCents,
-              paymentTiming: "recurring",
-              billingInterval: "year",
-              recurringPaymentStartDate: trialStartISO,
-            },
-            trialBilling: {
-              label: "7 dias grátis",
-              amount: 0,
-              paymentTiming: "deferred",
-              billingInterval: "week",
-            },
-          }
-        : {
-            paymentDescription: "Agenda AI – assinatura mensal",
-            regularBilling: {
-              label: "Agenda AI – Mensal",
-              amount: recurringAmountCents,
-              paymentTiming: "recurring",
-              billingInterval: "month",
-              recurringPaymentStartDate: nextMonthISO,
-            },
-          },
-    } as any); // 👈 evita erro de TS se as typings estiverem desatualizadas
+    } as any);
 
     pr.canMakePayment().then((res) => {
       if (res?.applePay || res?.googlePay) {
@@ -196,12 +227,11 @@ function WalletPRB({
     });
 
     return () => {
-      // cleanup ao desmontar/trocar plano
       setPaymentRequest(null);
       prRef.current = null;
       handlerAttached.current = false;
     };
-  }, [stripe, enabled, mode]); // 👈 não depende de name/email/phone/cupom
+  }, [stripe, enabled, mode, nowAmountCents, recurringAmountCents]);
 
   // anexa o handler UMA vez por instância (quando paymentRequest existir)
   React.useEffect(() => {
