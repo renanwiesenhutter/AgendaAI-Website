@@ -48,6 +48,40 @@ body.lock-scroll {
   overflow: hidden;
   height: 100dvh; /* evita “altura fantasma” quando some conteúdo */
 }
+
+/* === Autofill fix (Chrome/Edge/Safari/Firefox) === */
+
+/* Defina as cores padrão do teu campo (ajuste se o fundo não for branco) */
+:root {
+  --field-bg: #ffffff;  /* cor de fundo do input */
+  --field-fg: #0f172a;  /* cor do texto */
+}
+
+/* Se usar dark mode por classe .dark, ajuste aqui */
+.dark {
+  --field-bg: #0b1220;
+  --field-fg: #e2e8f0;
+}
+
+/* WebKit (Chrome/Edge/Safari) */
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--field-fg);
+  caret-color: var(--field-fg);
+  /* “tampa” o azul/amarelo do autofill com a cor do teu fundo */
+  box-shadow: 0 0 0 1000px var(--field-bg) inset !important;
+  /* evita “flash” de cor ao montar */
+  transition: background-color 9999s ease-out, color 9999s ease-out;
+}
+
+/* Firefox */
+input:-moz-autofill,
+textarea:-moz-autofill,
+select:-moz-autofill {
+  box-shadow: 0 0 0 1000px var(--field-bg) inset !important;
+  -moz-text-fill-color: var(--field-fg);
+}
 `}</style>
 
 // === Helpers (topo do arquivo) ===
@@ -109,9 +143,9 @@ function WalletPRB({
         label: mode === "annual" ? "Agenda AI – Anual" : "Agenda AI – Mensal",
         amount: nowAmountCents,
       },
-      requestPayerName: true,
-      requestPayerEmail: true,
-      requestPayerPhone: true,
+      requestPayerName: false,
+      requestPayerEmail: false,
+      requestPayerPhone: false,
       recurringPaymentRequest: mode === "annual"
         ? {
             paymentDescription: "Agenda AI – assinatura anual",
