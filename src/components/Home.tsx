@@ -1771,7 +1771,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
               
                 {/* Instagram */}
                 <a
-                  href="https://instagram.com/agenda.ai"
+                  href="https://www.instagram.com/agenda_ai_dalzzen/"
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Instagram"
@@ -1870,7 +1870,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                   </li>
                   <li>
                     <a
-                      href="https://instagram.com/agenda.ai"
+                      href="https://www.instagram.com/agenda_ai_dalzzen/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium transition-all duration-200 text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-700 hover:from-blue-600 hover:to-green-500"
