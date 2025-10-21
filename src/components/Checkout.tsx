@@ -118,24 +118,31 @@ function WalletPRB({
 }) {
   const stripe = useStripe();
 
-  // Mantém a MESMA instância do PaymentRequest
+  // refs sempre atualizados (sem remontar o PRB)
+  const couponRef = React.useRef<string | null>(null);
+  const contactRef = React.useRef<{ name: string; email: string; phone: string }>({ name: "", email: "", phone: "" });
+  React.useEffect(() => { couponRef.current = couponCode ?? null; }, [couponCode]);
+  React.useEffect(() => { contactRef.current = { name, email, phone }; }, [name, email, phone]);
+
+  // mantém a MESMA instância do PaymentRequest
   const prRef = React.useRef<any>(null);
   const [paymentRequest, setPaymentRequest] = React.useState<any>(null);
   const handlerAttached = React.useRef(false);
 
-  // Cria o PRB só quando Stripe/enable/mode mudarem (NÃO em cada tecla)
+  // cria o PRB só quando Stripe/enable/mode mudarem (NÃO em cada tecla/campo)
   React.useEffect(() => {
-    if (!stripe || !enabled) return;
+    if (!stripe || !enabled) { setPaymentRequest(null); prRef.current = null; handlerAttached.current = false; return; }
 
-    // Se o plano mudou, derruba a instância para recriar
+    // ao trocar o plano, zere instância anterior
     prRef.current = null;
     setPaymentRequest(null);
+    handlerAttached.current = false;
 
     const nextMonthISO = (() => {
       const d = new Date(); d.setMonth(d.getMonth() + 1);
       return d.toISOString().slice(0, 10);
     })();
-    const trialStartISO = new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10);
+    const trialStartISO = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const pr = stripe.paymentRequest({
       country: "BR",
@@ -144,9 +151,12 @@ function WalletPRB({
         label: mode === "annual" ? "Agenda AI – Anual" : "Agenda AI – Mensal",
         amount: nowAmountCents,
       },
+      // Se quiser coletar pelo sheet da carteira, mude para true:
       requestPayerName: false,
       requestPayerEmail: false,
       requestPayerPhone: false,
+
+      // Tipagem do pacote pode não ter esse campo ainda → usamos 'as any' no objeto inteiro
       recurringPaymentRequest: mode === "annual"
         ? {
             paymentDescription: "Agenda AI – assinatura anual",
@@ -174,7 +184,7 @@ function WalletPRB({
               recurringPaymentStartDate: nextMonthISO,
             },
           },
-    });
+    } as any); // 👈 evita erro de TS se as typings estiverem desatualizadas
 
     pr.canMakePayment().then((res) => {
       if (res?.applePay || res?.googlePay) {
@@ -185,58 +195,75 @@ function WalletPRB({
       }
     });
 
-    // Anexa o handler UMA vez por instância
-    if (!handlerAttached.current) {
-      pr.on("paymentmethod", async (ev: any) => {
-        try {
-          const base = "https://n8n.dalzzen.com/webhook";
-          const headers = {
-            "Content-Type": "application/json",
-            "x-api-key": "ZT6^HNWHJ6$dV8n5T6V7tioSzZ!W9BxHz#YZu5Si%Y8QUzd%TREEVADN@KDU@Pmz55uF!kKNMjG&g7f^nVEMxUqahCozK7%yZgFoMvis&8wf8Zvyhw&7kguxteBhqbDM",
-          };
+    return () => {
+      // cleanup ao desmontar/trocar plano
+      setPaymentRequest(null);
+      prRef.current = null;
+      handlerAttached.current = false;
+    };
+  }, [stripe, enabled, mode]); // 👈 não depende de name/email/phone/cupom
 
-          if (mode === "annual") {
-            const r = await fetch(`${base}/payment/yearly/init`, {
-              method: "POST", headers,
-              body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
-            });
-            const j = await r.json();
-            const cs: string | undefined = j?.client_secret;
-            if (!cs || !cs.startsWith("seti_")) { ev.complete("fail"); return; }
+  // anexa o handler UMA vez por instância (quando paymentRequest existir)
+  React.useEffect(() => {
+    if (!stripe || !paymentRequest || handlerAttached.current) return;
 
-            const { error } = await stripe!.confirmCardSetup(cs, {
-              payment_method: ev.paymentMethod.id,
-            });
-            if (error) { ev.complete("fail"); return; }
+    paymentRequest.on("paymentmethod", async (ev: any) => {
+      try {
+        const base = "https://n8n.dalzzen.com/webhook";
+        const headers = {
+          "Content-Type": "application/json",
+          "x-api-key": "ZT6^HNWHJ6$dV8n5T6V7tioSzZ!W9BxHz#YZu5Si%Y8QUzd%TREEVADN@KDU@Pmz55uF!kKNMjG&g7f^nVEMxUqahCozK7%yZgFoMvis&8wf8Zvyhw&7kguxteBhqbDM",
+        };
 
-            ev.complete("success");
-            onSuccess(undefined, "DALZZEN");
-          } else {
-            const r = await fetch(`${base}/payment/monthly/init`, {
-              method: "POST", headers,
-              body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
-            });
-            const j = await r.json();
-            const cs: string | undefined = j?.client_secret;
-            if (!cs || !cs.startsWith("pi_")) { ev.complete("fail"); return; }
+        const { name, email, phone } = contactRef.current;
+        const coupon = couponRef.current || undefined;
 
-            const pay = await stripe!.confirmCardPayment(cs, {
-              payment_method: ev.paymentMethod.id,
-            });
-            if (pay.error) { ev.complete("fail"); return; }
+        if (mode === "annual") {
+          // Trial agora (R$ 0) → SetupIntent
+          const r = await fetch(`${base}/payment/yearly/init`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ name, email, phone, coupon }),
+          });
+          const j = await r.json();
+          const cs: string | undefined = j?.client_secret;
+          if (!cs || !cs.startsWith("seti_")) { ev.complete("fail"); return; }
 
-            ev.complete("success");
-            onSuccess(pay.paymentIntent?.amount, "DALZZEN");
-          }
-        } catch {
-          ev.complete("fail");
+          const { error } = await stripe!.confirmCardSetup(cs, {
+            payment_method: ev.paymentMethod.id,
+          });
+          if (error) { ev.complete("fail"); return; }
+
+          ev.complete("success");
+          onSuccess(undefined, "DALZZEN");
+        } else {
+          // Cobra agora → PaymentIntent
+          const r = await fetch(`${base}/payment/monthly/init`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ name, email, phone, coupon }),
+          });
+          const j = await r.json();
+          const cs: string | undefined = j?.client_secret;
+          if (!cs || !cs.startsWith("pi_")) { ev.complete("fail"); return; }
+
+          const pay = await stripe!.confirmCardPayment(cs, {
+            payment_method: ev.paymentMethod.id,
+          });
+          if (pay.error) { ev.complete("fail"); return; }
+
+          ev.complete("success");
+          onSuccess(pay.paymentIntent?.amount, "DALZZEN");
         }
-      });
-      handlerAttached.current = true;
-    }
-  }, [stripe, enabled, mode]); // 👈 sem name/email/phone/a cada tecla
+      } catch {
+        ev.complete("fail");
+      }
+    });
 
-  // Se valores mudarem, atualize sem recriar o PR
+    handlerAttached.current = true;
+  }, [stripe, paymentRequest, mode]);
+
+  // se valores (preço) mudarem, atualize sem recriar o PR
   React.useEffect(() => {
     if (!prRef.current) return;
     prRef.current.update?.({
@@ -244,11 +271,11 @@ function WalletPRB({
         label: mode === "annual" ? "Agenda AI – Anual" : "Agenda AI – Mensal",
         amount: nowAmountCents,
       },
-      // displayItems também podem ser atualizados se você usar
+      // se usar displayItems, atualize aqui também
     });
   }, [nowAmountCents, mode]);
 
-  // Memoriza as options para não trocar identidade a cada render
+  // memoriza as options para não trocar identidade a cada render
   const prbOptions = React.useMemo(() => ({
     paymentRequest,
     style: {
