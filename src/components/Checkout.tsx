@@ -49,38 +49,39 @@ body.lock-scroll {
   height: 100dvh; /* evita “altura fantasma” quando some conteúdo */
 }
 
-/* === Autofill fix (Chrome/Edge/Safari/Firefox) === */
-
-/* Defina as cores padrão do teu campo (ajuste se o fundo não for branco) */
-:root {
-  --field-bg: #ffffff;  /* cor de fundo do input */
-  --field-fg: #0f172a;  /* cor do texto */
-}
-
-/* Se usar dark mode por classe .dark, ajuste aqui */
-.dark {
-  --field-bg: #0b1220;
-  --field-fg: #e2e8f0;
-}
-
-/* WebKit (Chrome/Edge/Safari) */
+/* === Neutraliza autofill no Chrome/Edge/Safari (WebKit) === */
 input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
 textarea:-webkit-autofill,
-select:-webkit-autofill {
-  -webkit-text-fill-color: var(--field-fg);
-  caret-color: var(--field-fg);
-  /* “tampa” o azul/amarelo do autofill com a cor do teu fundo */
-  box-shadow: 0 0 0 1000px var(--field-bg) inset !important;
-  /* evita “flash” de cor ao montar */
-  transition: background-color 9999s ease-out, color 9999s ease-out;
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  /* pinta por cima do fundo azul/amarelo do autofill */
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important; /* ajuste a cor ao seu fundo */
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important; /* cor do texto */
+  caret-color: #0f172a !important;
+  /* evita “flash” ao montar/focar */
+  transition: background-color 99999s ease-out, color 99999s ease-out !important;
 }
 
 /* Firefox */
 input:-moz-autofill,
 textarea:-moz-autofill,
 select:-moz-autofill {
-  box-shadow: 0 0 0 1000px var(--field-bg) inset !important;
-  -moz-text-fill-color: var(--field-fg);
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -moz-text-fill-color: #0f172a !important;
+}
+
+/* Se o seu input de telefone é o do react-phone-number-input */
+.PhoneInputInput:-webkit-autofill,
+.PhoneInputInput:-webkit-autofill:hover,
+.PhoneInputInput:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
 }
 `}</style>
 
