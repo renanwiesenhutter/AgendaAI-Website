@@ -1629,8 +1629,12 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                     </li>
                     <li className="flex items-center space-x-3">
                       <CheckCircle className="w-5 h-5 text-green-500" />
+                      <span className="text-gray-700">Economize 50%</span>
+                    </li>
+                    <li className="flex items-center space-x-3">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
                       <span className="text-gray-700 font-medium">
-                        Economize 50%
+                        Teste Grátis
                       </span>
                     </li>
                   </ul>
