@@ -1695,7 +1695,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
             <p className="text-xl text-gray-600 mb-8">
               Nossa equipe está pronta para ajudar e responder a todas as suas perguntas.
             </p>
-            <a href="https://wa.me/5545988251919?text=Ol%C3%A1%21%20Gostaria%20de%20ajuda%20com%20o%20Agenda.ai" 
+            <a href="https://wa.me/5545991453366?text=Ol%C3%A1%21%20Gostaria%20de%20ajuda%20com%20o%20Agenda.ai" 
               target="_blank" 
               rel="noopener noreferrer" 
               className="inline-flex items-center space-x-3 bg-green-500 text-white px-8 py-4 rounded-lg hover:bg-green-600 hover:shadow-lg transition-all duration-300 ease-out font-medium text-lg shadow-md">
@@ -1760,7 +1760,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
               <div className="mt-3 flex items-center gap-4">
                 {/* WhatsApp */}
                 <a
-                  href="https://wa.me/5545988251919"
+                  href="https://wa.me/5545991453366?text=Ol%C3%A1%21%20Gostaria%20de%20ajuda%20com%20o%20Agenda.ai"
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="WhatsApp"
@@ -1860,7 +1860,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                 <ul className="space-y-2">
                   <li>
                     <a
-                      href="https://wa.me/5545988251919?text=Ol%C3%A1%21%20Gostaria%20de%20ajuda%20com%20o%20Agenda.ai"
+                      href="https://wa.me/5545991453366?text=Ol%C3%A1%21%20Gostaria%20de%20ajuda%20com%20o%20Agenda.ai"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium transition-all duration-200 text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-700 hover:from-blue-600 hover:to-green-500"
