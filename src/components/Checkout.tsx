@@ -48,41 +48,6 @@ body.lock-scroll {
   overflow: hidden;
   height: 100dvh; /* evita “altura fantasma” quando some conteúdo */
 }
-
-/* === Neutraliza autofill no Chrome/Edge/Safari (WebKit) === */
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-textarea:-webkit-autofill,
-textarea:-webkit-autofill:hover,
-textarea:-webkit-autofill:focus,
-select:-webkit-autofill,
-select:-webkit-autofill:hover,
-select:-webkit-autofill:focus {
-  /* pinta por cima do fundo azul/amarelo do autofill */
-  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important; /* ajuste a cor ao seu fundo */
-  box-shadow: 0 0 0 1000px #ffffff inset !important;
-  -webkit-text-fill-color: #0f172a !important; /* cor do texto */
-  caret-color: #0f172a !important;
-  /* evita “flash” ao montar/focar */
-  transition: background-color 99999s ease-out, color 99999s ease-out !important;
-}
-
-/* Firefox */
-input:-moz-autofill,
-textarea:-moz-autofill,
-select:-moz-autofill {
-  box-shadow: 0 0 0 1000px #ffffff inset !important;
-  -moz-text-fill-color: #0f172a !important;
-}
-
-/* Se o seu input de telefone é o do react-phone-number-input */
-.PhoneInputInput:-webkit-autofill,
-.PhoneInputInput:-webkit-autofill:hover,
-.PhoneInputInput:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
-  box-shadow: 0 0 0 1000px #ffffff inset !important;
-}
 `}</style>
 
 // === Helpers (topo do arquivo) ===
@@ -2363,6 +2328,7 @@ React.useEffect(() => {
                               <input
                                 type="email"
                                 placeholder="email@gmail.com"
+                                autoComplete="email"
                                 value={email}
                                 maxLength={50}
                                 onChange={(e) => setEmail(e.target.value)}
