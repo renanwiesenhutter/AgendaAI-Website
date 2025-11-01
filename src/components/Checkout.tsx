@@ -70,6 +70,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK!);
 function WalletPRB({
   enabled, name, email, phone, couponCode, onSuccess, mode,
   nowAmountCents, recurringAmountCents,
+  annualHasTrial,
 }: {
   enabled: boolean;
   name: string;
@@ -80,6 +81,7 @@ function WalletPRB({
   mode: "annual" | "monthly";
   nowAmountCents: number;
   recurringAmountCents: number;
+  annualHasTrial: boolean; // <-- NOVO
 }) {
   const stripe = useStripe();
 
@@ -113,63 +115,72 @@ function WalletPRB({
       country: "BR",
       currency: "brl",
 
-      applePay:
-        mode === "annual"
-          ? {
-              recurringPaymentRequest: {
-                paymentDescription: "Agenda AI - Assinatura Anual",
-                managementURL: "https://agendaai.dalzzen.com/assinaturas",
-
-                // 🔹 Termos Legais (texto no topo)
-                termsAndConditions: {
-                  label: "Detalhes da Cobrança",
-                  text:
-                    "Ao confirmar a inscrição, o senhor concede permissão à Dalzzen para efetuar cobranças conforme as condições estipuladas, até que ocorra o cancelamento.",
-                },
-
-                // 🔹 trial mostrado como "7 dias grátis" no sheet
-                trialBilling: {
-                  label: "7 dias grátis",
-                  amount: 0,                               // sem cobrança no trial
-                  startDate: now.toISOString(),            // começa agora
-                  endDate: startAfterTrial.toISOString(),  // termina em 7 dias
-                },
-
-                // 🔹 ciclo regular mostrado com "A partir de <data>"
-                regularBilling: {
-                  label: "Agenda AI",
-                  amount: recurringAmountCents,            // 11880 (ou com cupom)
-                  recurringPaymentStartDate: startAfterTrial.toISOString(),// <- gera "A partir de (data)"
-                  recurringPaymentIntervalUnit: "year",
-                  recurringPaymentIntervalCount: 1,
-                },
+    applePay:
+      mode === "annual"
+        ? (
+            annualHasTrial
+              // ======== ANUAL COM TRIAL ========
+              ? {
+                  recurringPaymentRequest: {
+                    paymentDescription: "Agenda AI - Assinatura Anual",
+                    managementURL: "https://agendaai.dalzzen.com/assinaturas",
+                    termsAndConditions: {
+                      label: "Detalhes da Cobrança",
+                      text: "Ao confirmar a inscrição, o senhor concede permissão à Dalzzen para efetuar cobranças conforme as condições estipuladas, até que ocorra o cancelamento.",
+                    },
+                    trialBilling: {
+                      label: "7 dias grátis",
+                      amount: 0,
+                      startDate: now.toISOString(),
+                      endDate: startAfterTrial.toISOString(),
+                    },
+                    regularBilling: {
+                      label: "Agenda AI",
+                      amount: recurringAmountCents,
+                      recurringPaymentStartDate: startAfterTrial.toISOString(),
+                      recurringPaymentIntervalUnit: "year",
+                      recurringPaymentIntervalCount: 1,
+                    },
+                  },
+                }
+              // ======== ANUAL SEM TRIAL ========
+              : {
+                  recurringPaymentRequest: {
+                    paymentDescription: "Agenda AI - Assinatura Anual",
+                    managementURL: "https://agendaai.dalzzen.com/assinaturas",
+                    termsAndConditions: {
+                      label: "Detalhes da Cobrança",
+                      text: "Ao confirmar a inscrição, o senhor concede permissão à Dalzzen para efetuar cobranças conforme as condições estipuladas, até que ocorra o cancelamento.",
+                    },
+                    // sem trialBilling
+                    regularBilling: {
+                      label: "Agenda AI",
+                      amount: recurringAmountCents,
+                      recurringPaymentStartDate: now.toISOString(), // cobra a partir de agora
+                      recurringPaymentIntervalUnit: "year",
+                      recurringPaymentIntervalCount: 1,
+                    },
+                  },
+                }
+          )
+        // ======== MENSAL ========
+        : {
+            recurringPaymentRequest: {
+              paymentDescription: "Agenda AI - Assinatura Mensal",
+              managementURL: "https://agendaai.dalzzen.com/assinaturas",
+              termsAndConditions: {
+                label: "Detalhes da Cobrança",
+                text: "Ao confirmar a inscrição, o senhor concede permissão à Dalzzen para efetuar cobranças mensais conforme as condições estipuladas, até que ocorra o cancelamento.",
               },
-            }
-          : {
-              // ======== MENSAL (sem teste grátis) ========
-              recurringPaymentRequest: {
-                paymentDescription: "Agenda AI - Assinatura Mensal",
-                managementURL: "https://agendaai.dalzzen.com/assinaturas",
-
-                // 🔹 Termos Legais (texto no topo)
-                termsAndConditions: {
-                  label: "Detalhes da Cobrança",
-                  text:
-                    "Ao confirmar a inscrição, o senhor concede permissão à Dalzzen para efetuar cobranças mensais conforme as condições estipuladas, até que ocorra o cancelamento.",
-                },
-
-                // ❌ Sem trialBilling no mensal
-
-                // 🔹 cobrança recorrente começando agora
-                regularBilling: {
-                  label: "Agenda AI",
-                  amount: recurringAmountCents,            // 1990, por ex. (já com cupom se houver)
-                  recurringPaymentStartDate: now.toISOString(),            // gera “Começando agora”
-                  recurringPaymentIntervalUnit: "month",
-                  recurringPaymentIntervalCount: 1,
-                },
+              regularBilling: {
+                label: "Agenda AI",
+                amount: recurringAmountCents,
+                recurringPaymentStartDate: now.toISOString(),
+                recurringPaymentIntervalUnit: "month",
+                recurringPaymentIntervalCount: 1,
               },
             },
+          },
 
       // Valor devido AGORA
       total: {
@@ -214,25 +225,45 @@ function WalletPRB({
         const coupon = couponRef.current || undefined;
 
         if (mode === "annual") {
-          // Trial agora (R$ 0) → SetupIntent
-          const r = await fetch(`${base}/payment/yearly/init`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ name, email, phone, coupon }),
-          });
-          const j = await r.json();
-          const cs: string | undefined = j?.client_secret;
-          if (!cs || !cs.startsWith("seti_")) { ev.complete("fail"); return; }
+          if (annualHasTrial) {
+            // ===== ANUAL COM TRIAL → SetupIntent =====
+            const r = await fetch(`${base}/payment/yearly/init`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ name, email, phone, coupon }),
+            });
+            const j = await r.json();
+            const cs: string | undefined = j?.client_secret;
+            if (!cs || !cs.startsWith("seti_")) { ev.complete("fail"); return; }
 
-          const { error } = await stripe!.confirmCardSetup(cs, {
-            payment_method: ev.paymentMethod.id,
-          });
-          if (error) { ev.complete("fail"); return; }
+            const { error } = await stripe!.confirmCardSetup(cs, {
+              payment_method: ev.paymentMethod.id,
+            });
+            if (error) { ev.complete("fail"); return; }
 
-          ev.complete("success");
-          onSuccess(undefined, "DALZZEN");
+            ev.complete("success");
+            onSuccess(undefined, "DALZZEN");
+          } else {
+            // ===== ANUAL SEM TRIAL → PaymentIntent em /payment/without/trial =====
+            const r = await fetch(`${base}/payment/without/trial`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ name, email, phone, coupon }),
+            });
+            const j = await r.json();
+            const cs: string | undefined = j?.client_secret;
+            if (!cs || !cs.startsWith("pi_")) { ev.complete("fail"); return; }
+
+            const pay = await stripe!.confirmCardPayment(cs, {
+              payment_method: ev.paymentMethod.id,
+            });
+            if (pay.error) { ev.complete("fail"); return; }
+
+            ev.complete("success");
+            onSuccess(pay.paymentIntent?.amount, "DALZZEN");
+          }
         } else {
-          // Cobra agora → PaymentIntent
+          // ===== MENSAL (sem trial) → PaymentIntent =====
           const r = await fetch(`${base}/payment/monthly/init`, {
             method: "POST",
             headers,
@@ -295,14 +326,16 @@ function WalletPRB({
 function StripePaymentForm({
   contactValid, name, email, phone, onSuccess, couponCode,
   nowAmountCents, recurringAmountCents,
-  mode, // "annual" | "monthly"
+  mode,
+  annualHasTrial, // <-- NOVO
 }: {
   contactValid: boolean; name: string; email: string; phone: string;
   onSuccess: (amountCents?: number, brand?: string) => void;
   couponCode?: string | null;
   mode: "annual" | "monthly";
-  nowAmountCents: number;          // cobra AGORA (0 no anual)
-  recurringAmountCents: number;    // valor recorrente
+  nowAmountCents: number;
+  recurringAmountCents: number;
+  annualHasTrial: boolean; // <-- NOVO
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -343,24 +376,39 @@ function StripePaymentForm({
       };
 
       if (mode === "annual") {
-        const res = await fetch(`${base}/payment/yearly/init`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const cs: string | undefined = data?.client_secret;
-        if (!cs || !cs.startsWith("seti_")) throw new Error("Esperava client_secret de SetupIntent (seti_...).");
+        if (annualHasTrial) {
+          // ===== ANUAL COM TRIAL → SetupIntent =====
+          const res = await fetch(`${base}/payment/yearly/init`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const cs: string | undefined = data?.client_secret;
+          if (!cs || !cs.startsWith("seti_")) throw new Error("Esperava client_secret de SetupIntent (seti_...).");
 
-        const result = await stripe.confirmSetup({
-          elements,
-          clientSecret: cs,
-          redirect: "if_required",
-        });
-        if (result.error) throw new Error(result.error.message || "Não foi possível processar.");
-        onSuccess(undefined, "DALZZEN");
+          const result = await stripe.confirmSetup({ elements, clientSecret: cs, redirect: "if_required" });
+          if (result.error) throw new Error(result.error.message || "Não foi possível processar.");
+          onSuccess(undefined, "DALZZEN");
+        } else {
+          // ===== ANUAL SEM TRIAL → PaymentIntent em /payment/without/trial =====
+          const res = await fetch(`${base}/payment/without/trial`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ name, email, phone, coupon: couponCode || undefined }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const cs: string | undefined = data?.client_secret;
+          if (!cs || !cs.startsWith("pi_")) throw new Error("Esperava client_secret de PaymentIntent (pi_...).");
+
+          const pay = await stripe.confirmPayment({ elements, clientSecret: cs, redirect: "if_required" });
+          if (pay.error) throw new Error(pay.error.message || "Falha ao confirmar o pagamento.");
+          onSuccess(pay.paymentIntent?.amount, "DALZZEN");
+        }
       } else {
+        // ===== MENSAL → PaymentIntent =====
         const res = await fetch(`${base}/payment/monthly/init`, {
           method: "POST",
           headers,
@@ -371,11 +419,7 @@ function StripePaymentForm({
         const cs: string | undefined = data?.client_secret;
         if (!cs || !cs.startsWith("pi_")) throw new Error("Esperava client_secret de PaymentIntent (pi_...).");
 
-        const pay = await stripe.confirmPayment({
-          elements,
-          clientSecret: cs,
-          redirect: "if_required",
-        });
+        const pay = await stripe.confirmPayment({ elements, clientSecret: cs, redirect: "if_required" });
         if (pay.error) throw new Error(pay.error.message || "Falha ao confirmar o pagamento.");
         onSuccess(pay.paymentIntent?.amount, "DALZZEN");
       }
@@ -411,17 +455,18 @@ function StripePaymentForm({
             {!contactValid && (
               <div className="absolute inset-0 z-10 cursor-not-allowed" role="presentation" aria-hidden="true" />
             )}
-            <WalletPRB
-              enabled={true}
-              mode={mode}
-              name={name}
-              email={email}
-              phone={phone}
-              couponCode={couponCode ?? null}
-              onSuccess={onSuccess}
-              nowAmountCents={nowAmountCents}
-              recurringAmountCents={recurringAmountCents}
-            />
+          <WalletPRB
+            enabled={true}
+            mode={mode}
+            name={name}
+            email={email}
+            phone={phone}
+            couponCode={couponCode ?? null}
+            onSuccess={onSuccess}
+            nowAmountCents={nowAmountCents}
+            recurringAmountCents={recurringAmountCents}
+            annualHasTrial={annualHasTrial}   // <-- NOVO
+          />
           </div>
         ) : (
           <button
@@ -442,7 +487,7 @@ function StripePaymentForm({
             <span className="grid grid-cols-[1.25rem_1fr_1.25rem] items-center px-6">
               <span aria-hidden className="w-5 h-5" />
               <span className="justify-self-center">
-                {loading ? "Processando..." : mode === "annual" ? "Iniciar teste" : "Assinar"}
+                {loading ? "Processando..." : nowAmountCents === 0 ? "Iniciar teste" : "Assinar"}
               </span>
               <svg aria-hidden className={`justify-self-end w-5 h-5 ${loading ? "opacity-100" : "opacity-0"} transition-opacity animate-spin`} viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
@@ -880,6 +925,7 @@ type LookupState = {
   checking: boolean;
   checkedEmail?: string;
   hasActive: boolean;
+  usedTrial?: boolean;
   portalUrl?: string;
   error?: string;
 };
@@ -925,6 +971,7 @@ React.useEffect(() => {
       const json: {
         ok?: boolean;
         hasActive?: boolean;
+        usedTrial?: boolean;
         portalUrl?: string;
         email?: string;
         customerId?: string;
@@ -937,6 +984,7 @@ React.useEffect(() => {
           checking: false,
           checkedEmail: trimmedEmail,
           hasActive: true,
+          usedTrial: !!json.usedTrial,
           portalUrl: json.portalUrl,
         });
       } else {
@@ -944,6 +992,7 @@ React.useEffect(() => {
           checking: false,
           checkedEmail: trimmedEmail,
           hasActive: false,
+          usedTrial: !!json.usedTrial,
         });
       }
     } catch (e) {
@@ -995,6 +1044,7 @@ const plan =
     : "annual"; // default: annual
 
 const isAnnual = plan === "annual";
+const annualHasTrial = isAnnual && !(lookup.usedTrial === true);
 
 const THEME_BG = isAnnual
   ? "bg-gradient-to-r from-blue-500 to-green-600" // anual
@@ -1422,13 +1472,8 @@ const handlePhoneChange = React.useCallback(
 
   const subtotalAfterCents = Math.max(FULL_PRICE - discountValueCents, 0);
 
-const nowAmountCents =
-  isAnnual ? 0 : subtotalAfterCents;
-
-const recurringAmountCents =
-  isAnnual
-    ? subtotalAfterCents
-    : subtotalAfterCents; // <- se for só 1º mês, use FULL_PRICE aqui
+  const nowAmountCents   = annualHasTrial ? 0 : subtotalAfterCents;
+  const recurringAmountCents = subtotalAfterCents;
 
 // --- dentro do seu componente CheckoutPage ---
 const exitFiredRef = React.useRef(false);
@@ -1625,21 +1670,30 @@ React.useEffect(() => {
                   <p className="text-sm font-medium leading-tight">
                     {`Agenda AI - ${isAnnual ? "Anual" : "Mensal"}`}
                   </p>
-                  {!isAnnual && (
+
+                  {isAnnual ? (
+                    !annualHasTrial ? (
+                      <p className="text-xs text-[#FFFFFF80] mt-1">Cobrado anualmente</p>
+                    ) : null
+                  ) : (
                     <p className="text-xs text-[#FFFFFF80] mt-1">Cobrado mensalmente</p>
                   )}
                 </div>
             
                 <div className="text-right leading-tight self-start">
                   {isAnnual ? (
-                    <>
-                      <p className="text-sm font-semibold">7 dias grátis</p>
-                      <p className="text-xs font-medium text-[#FFFFFF80]">
-                        Depois {fmtBRL(subtotalAfterCents)}/ano
-                      </p>
-                    </>
+                    annualHasTrial ? (
+                      <>
+                        <p className="text-sm font-semibold">7 dias grátis</p>
+                        <p className="text-xs font-medium text-[#FFFFFF80]">
+                          Depois {fmtBRL(subtotalAfterCents)}/ano
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-semibold">{fmtBRL(subtotalAfterCents)}</p>
+                    )
                   ) : (
-                    <p className="text-sm font-medium">{fmtBRL(subtotalAfterCents)}</p>
+                    <p className="text-sm font-semibold">{fmtBRL(subtotalAfterCents)}</p>
                   )}
                 </div>
               </div>
@@ -1802,24 +1856,30 @@ React.useEffect(() => {
               {/* ===== /Subtotal + Cupom + hr ===== */}
       
               {/* Totais — SEMPRE visíveis */}
-              {isAnnual ? (
+              {isAnnual && annualHasTrial ? (
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Total após período de avaliação</span>
                   <span className="text-sm font-medium">{fmtBRL(subtotalAfterCents)}</span>
                 </div>
               ) : (
+                /* NOVO: Próxima fatura quando houver cupom
+                  - Mensal: sempre que tiver cupom
+                  - Anual: só quando NÃO houver trial (usedTrial === true)
+                */
                 hasCouponApplied && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Próxima fatura</span>
-                    <span className="text-sm font-medium">{fmtBRL(NEXT_INVOICE_MONTHLY_CENTS)}</span>
+                    <span className="text-sm font-medium">
+                      {fmtBRL(isAnnual ? FULL_PRICE : NEXT_INVOICE_MONTHLY_CENTS)}
+                    </span>
                   </div>
                 )
               )}
-      
+
               <div className="mt-1 flex items-center justify-between">
                 <span className="text-sm font-semibold">Total devido hoje</span>
                 <span className="text-base font-semibold">
-                  {isAnnual ? "R$ 0,00" : fmtBRL(subtotalAfterCents)}
+                  {annualHasTrial ? "R$ 0,00" : fmtBRL(subtotalAfterCents)}
                 </span>
               </div>
             </div>
@@ -1863,19 +1923,30 @@ React.useEffect(() => {
         
               <div className="text-center mb-0 pt-0">
                 <p className="text-[#ffffff99] text-base mb-0 font-medium">
-                  {isAnnual ? "Testar Agenda AI - Anual" : "Assinar Agenda AI - Mensal"}
+                  {isAnnual ? (annualHasTrial ? "Testar Agenda AI - Anual" : "Assinar Agenda AI - Anual")
+                  : "Assinar Agenda AI - Mensal"}
                 </p>
               
                 {isAnnual ? (
-                  <>
-                    <h1 className="text-[30px] font-bold mb-0">7 dias grátis</h1>
-                    <p className="text-[#ffffff99] text-sm font-medium leading-snug">
-                      Depois, <span className="font-bold">{fmtBRL(subtotalAfterCents)}</span> por ano começando em {chargeDateStr}
-                    </p>
-                  </>
+                  annualHasTrial ? (
+                    <>
+                      <h1 className="text-[30px] font-bold mb-0">7 dias grátis</h1>
+                      <p className="text-[#ffffff99] text-sm font-medium leading-snug">
+                        Depois, <span className="font-bold">{fmtBRL(subtotalAfterCents)}</span> por ano começando em {chargeDateStr}
+                      </p>
+                    </>
+                  ) : (
+                    <h1 className="text-[30px] font-semibold mb-0">
+                      <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap align-top">
+                        <span>{fmtBRL(subtotalAfterCents)}</span>
+                        <span className="text-[14px] font-semibold leading-none text-[#ffffff99] -translate-y-[2px]">
+                          {"por\u00A0ano"}
+                        </span>
+                      </span>
+                    </h1>
+                  )
                 ) : (
                   <>
-                    {/* R$ 19,90 com “por / mês” quebrado ao lado */}
                     <h1 className="text-[30px] font-semibold mb-0">
                       <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap align-top">
                         <span>{fmtBRL(subtotalAfterCents)}</span>
@@ -1884,11 +1955,10 @@ React.useEffect(() => {
                         </span>
                       </span>
                     </h1>
-                    {/* no mensal não mostra a linha “Depois…” */}
                   </>
                 )}
               </div>
-        
+
               <div className="flex justify-center mt-2">
               <button
                 type="button"
@@ -1933,16 +2003,29 @@ React.useEffect(() => {
           
             <div className="mb-6">
               <p className="text-[#ffffff99] text-base mb-1 font-semibold">
-                {isAnnual ? "Testar Agenda AI - Anual" : "Assinar Agenda AI - Mensal"}
+                {isAnnual ? (annualHasTrial ? "Testar Agenda AI - Anual" : "Assinar Agenda AI - Anual")
+                : "Assinar Agenda AI - Mensal"}
               </p>
             
               {isAnnual ? (
-                <>
-                  <h1 className="text-4xl font-bold mb-2">7 dias grátis</h1>
-                  <p className="text-[#ffffff99] text-sm font-semibold">
-                    Depois, <span className="text-sm font-bold">{fmtBRL(subtotalAfterCents)}</span> por ano começando em {chargeDateStr}
-                  </p>
-                </>
+                annualHasTrial ? (
+                  <>
+                    <h1 className="text-4xl font-bold mb-2">7 dias grátis</h1>
+                    <p className="text-[#ffffff99] text-sm font-semibold">
+                      Depois, <span className="text-sm font-bold">{fmtBRL(subtotalAfterCents)}</span> por ano começando em {chargeDateStr}
+                    </p>
+                  </>
+                ) : (
+                  <h1 className="text-4xl font-semibold mb-2">
+                    <span className="inline-flex items-start align-top">
+                      <span>{fmtBRL(subtotalAfterCents)}</span>
+                      <span className="ml-2 grid grid-rows-2 text-3xl font-semibold text-[#ffffff99] leading-none">
+                        <span className="text-[0.5em] leading-[1.5]">por</span>
+                        <span className="text-[0.5em] leading-[1]">ano</span>
+                      </span>
+                    </span>
+                  </h1>
+                )
               ) : (
               <h1 className="text-4xl font-semibold mb-2">
                 <span className="inline-flex items-start align-top">
@@ -1961,19 +2044,28 @@ React.useEffect(() => {
                 <div className="col-start-1 row-start-1 row-span-2 w-10 h-10 bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center">
                   <Calendar className="w-5 h-5 text-white" />
                 </div>
-          
+
                 <p className="col-start-2 text-sm font-medium leading-tight">
                   {`Agenda AI - ${isAnnual ? "Anual" : "Mensal"}`}
                 </p>
+
                 {!isAnnual && (
                   <p className="col-start-2 text-xs text-[#FFFFFF80] mt-1">Cobrado mensalmente</p>
                 )}
+                {isAnnual && !annualHasTrial && (
+                  <p className="col-start-2 text-xs text-[#FFFFFF80] mt-1">Cobrado anualmente</p>
+                )}
+
                 <div className="col-start-3 row-start-1 self-start text-right">
                   {isAnnual ? (
-                    <>
-                      <p className="text-sm font-medium">7 dias grátis</p>
-                      <p className="text-xs text-[#ffffff80]">Depois {fmtBRL(subtotalAfterCents)}/ano</p>
-                    </>
+                    annualHasTrial ? (
+                      <>
+                        <p className="text-sm font-medium">7 dias grátis</p>
+                        <p className="text-xs text-[#ffffff80]">Depois {fmtBRL(subtotalAfterCents)}/ano</p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-semibold">{fmtBRL(subtotalAfterCents)}</p>
+                    )
                   ) : (
                     <p className="text-sm font-semibold">{fmtBRL(subtotalAfterCents)}</p>
                   )}
@@ -2137,31 +2229,29 @@ React.useEffect(() => {
                 )}
                 
                 {/* ===== /Subtotal + Cupom + hr ===== */}
-                {isAnnual ? (
+                {isAnnual && annualHasTrial ? (
                   <>
-                    <p className="col-start-2 text-white font-medium text-sm">
-                      Total após período de avaliação
-                    </p>
-                    <p className="col-start-3 text-right font-medium text-sm">
-                      {fmtBRL(subtotalAfterCents)}
-                    </p>
+                    <p className="col-start-2 text-white font-medium text-sm">Total após período de avaliação</p>
+                    <p className="col-start-3 text-right font-medium text-sm">{fmtBRL(subtotalAfterCents)}</p>
                   </>
                 ) : (
+                  /* NOVO: Próxima fatura quando houver cupom
+                    - Mensal: sempre que tiver cupom
+                    - Anual: só quando NÃO houver trial
+                  */
                   hasCouponApplied && (
                     <>
-                      <p className="col-start-2 text-white font-medium text-sm">
-                        Próxima fatura
-                      </p>
+                      <p className="col-start-2 text-white font-medium text-sm">Próxima fatura</p>
                       <p className="col-start-3 text-right font-medium text-sm">
-                        {fmtBRL(NEXT_INVOICE_MONTHLY_CENTS)}
+                        {fmtBRL(isAnnual ? FULL_PRICE : NEXT_INVOICE_MONTHLY_CENTS)}
                       </p>
                     </>
                   )
                 )}
-                
+
                 <p className="col-start-2 text-white font-semibold text-sm">Total devido hoje</p>
                 <p className="col-start-3 text-right font-semibold text-base">
-                  {isAnnual ? "R$ 0,00" : fmtBRL(subtotalAfterCents)}
+                  {annualHasTrial ? "R$ 0,00" : fmtBRL(subtotalAfterCents)}
                 </p>
                 
               </div>
@@ -2457,17 +2547,18 @@ React.useEffect(() => {
                     <h3 className="text-x2 font-medium text-gray-700 mb-2">Forma de pagamento</h3>
                     {clientSecret ? (
                       <Elements stripe={stripePromise} options={elementsOptions}>
-                        <StripePaymentForm
-                          contactValid={contactValid}
-                          name={name}
-                          email={email}
-                          phone={phone}
-                          onSuccess={startSuccessTransition}
-                          couponCode={applied?.code ?? null}
-                          mode={isAnnual ? "annual" : "monthly"}
-                          nowAmountCents={nowAmountCents}
-                          recurringAmountCents={recurringAmountCents}
-                        />
+                      <StripePaymentForm
+                        contactValid={contactValid}
+                        name={name}
+                        email={email}
+                        phone={phone}
+                        onSuccess={startSuccessTransition}
+                        couponCode={applied?.code ?? null}
+                        mode={isAnnual ? "annual" : "monthly"}
+                        nowAmountCents={nowAmountCents}
+                        recurringAmountCents={recurringAmountCents}
+                        annualHasTrial={annualHasTrial}   // <-- NOVO
+                      />
                       </Elements>
                     ) : (
                       <div className="p-4 border rounded-md text-sm text-gray-500">
