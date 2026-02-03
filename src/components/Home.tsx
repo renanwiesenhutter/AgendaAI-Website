@@ -5,6 +5,7 @@ import { Link, useLocation } from "react-router-dom";
 
 function Home() {
   const [fullscreenMedia, setFullscreenMedia] = useState<{ type: 'image' | 'video', src: string } | null>(null);
+  const [imgLoading, setImgLoading] = useState(false);
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -147,6 +148,7 @@ function Home() {
 
 // Image Player
 function openFullscreen(type: "image", src: string) {
+  setImgLoading(true);
   setFullscreenMedia({ type, src });
 }
 
@@ -862,61 +864,6 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
         {/* Como Funciona */}
         <section id="como-funciona" className="py-20 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <div className="flex items-center justify-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-green-600 rounded-2xl flex items-center justify-center">
-                  <Calendar className="w-8 h-8 text-white" />
-                </div>
-              </div>
-              <h3 className="text-4xl md:text-5xl font-bold text-gray-900 mb-8">
-                Agenda Inteligente
-              </h3>
-            </div>
-
-        {/* Video Player */}
-        <div className="max-w-6xl mx-auto mb-12">
-        <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl">
-          <video
-            ref={videoRef}
-            className="w-full aspect-video"
-            controls
-            controlsList="nodownload"
-            disablePictureInPicture
-            onContextMenu={(e) => e.preventDefault()}
-            playsInline
-            poster="https://peach.blender.org/wp-content/uploads/title_anouncement.jpg?x11217">  
-      <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4" />
-      Seu navegador não suporta vídeo.
-    </video>
-  </div>
-</div>
-
-            {/* Text Content */}
-            <div className="max-w-4xl mx-auto text-left mb-32">
-              <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                Com o Agenda AI, você organiza sua agenda 
-                diretamente pelo WhatsApp. Basta enviar mensagens como 
-                "Minha reunião amanhã é as 14h" ou "Me lembre de tomar meu remedio todos os dias as 20:00" e a nossa IA já registra e categoriza automaticamente todos os seus compromissos.
-              </p>
-              
-              <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                Ele envia lembretes, resumos diários e mantém tudo 
-                organizado dentro do seu calendário de forma inteligente.
-              </p>
-              
-              <p className="text-lg text-gray-700 mb-8 leading-relaxed">
-                Simples, eficiente e sempre disponível para garantir que você 
-                nunca perca um compromisso.
-              </p>
-              
-              <div className="flex justify-start">
-                <a href="#precos" className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2">
-                  <span>Comprar agora</span>
-                  <span>→</span>
-                </a>
-              </div>
-            </div>
-
             {/* Steps - Alternating Layout */}
             <div className="space-y-20 md:space-y-20 lg:space-y-20">
               {/* Step 1 - Left Content, Right Video */}
@@ -1478,15 +1425,32 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[9999] flex items-center justify-center">
                   <button
                     className="absolute top-6 right-6 text-white text-5xl font-light hover:opacity-80 transition"
-                    onClick={() => setFullscreenMedia(null)}
+                    onClick={() => { setFullscreenMedia(null); setImgLoading(false); }}
+                    aria-label="Fechar"
                   >
                     ×
                   </button>
-                  <img
-                    src={fullscreenMedia.src}
-                    alt="Imagem em fullscreen"
-                    className="max-w-[90%] max-h-[90%] rounded-lg shadow-sm"
-                  />
+
+                  {/* Wrapper para poder ter overlay em cima da imagem */}
+                  <div className="relative max-w-[90%] max-h-[90%]">
+                    {/* Loading overlay */}
+                    {imgLoading && (
+                      <div className="absolute inset-0 grid place-items-center bg-black/40 rounded-lg">
+                        <div className="w-12 h-12 border-4 border-white/40 border-t-white rounded-full animate-spin" />
+                      </div>
+                    )}
+
+                    <img
+                      src={fullscreenMedia.src}
+                      alt="Imagem em fullscreen"
+                      className={`max-w-[90vw] max-h-[90vh] rounded-lg shadow-sm transition-opacity duration-200 ${
+                        imgLoading ? "opacity-0" : "opacity-100"
+                      }`}
+                      onLoad={() => setImgLoading(false)}
+                      onError={() => setImgLoading(false)}
+                      draggable={false}
+                    />
+                  </div>
                 </div>
               )}
               
