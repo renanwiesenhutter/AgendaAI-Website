@@ -392,48 +392,24 @@ function AutoPlayVideo({
 // ===== Depoimentos (carrossel) =====
 const depoItems = [
   {
-    id: "t1",
-    type: "video" as const,
-    src: "https://dl.dropboxusercontent.com/scl/fi/s1j0ytva5ffmeu49t2ap9/Mockup-Video.mp4?rlkey=1wvspc4mvrvmxocloediz5pwh&st=tofpmi8p",
-    poster: "https://www.dropbox.com/scl/fi/ku1zvvw7ird9y4klnyput/Mockup-Cover.webp?rlkey=tq6txw6dahhio75ivh870t0c8&st=b9bj6alr&raw=1"
-  },
-  {
-    id: "t2",
-    type: "video" as const,
-    src: "https://dl.dropboxusercontent.com/scl/fi/ydhta8ez80pe40zscxld0/02-Video.mp4?rlkey=hv3xim9grqju3ov77bpvo5uod&st=83p8rvce",
-    poster: "https://www.dropbox.com/scl/fi/j38tvhdrig3hcag49fyx2/02-Cover.webp?rlkey=x41qx2cgobvr23txggrwm2ovk&st=kl4qzrkk&raw=1"
-  },
-  {
-    id: "t3",
-    type: "video" as const,
-    src: "https://dl.dropboxusercontent.com/scl/fi/hyvngtp0bik0qhjl2r5a6/03-Video.mp4?rlkey=toc1p10pboahgnoiu5xyi398d&st=k8eske51",
-    poster: "https://www.dropbox.com/scl/fi/zavay6564o3eh8ec1l3rc/03-Cover.webp?rlkey=8gfbqg11wt6dg985k4b88nlot&st=2e7bqbaz&raw=1"
-  },
-  {
-    id: "t4",
-    type: "video" as const,
-    src: "https://dl.dropboxusercontent.com/scl/fi/4qqo8l3ehrhanjf4spezh/04-Video.mp4?rlkey=tqekzdg2abffhisux0o3nqojp&st=vetom8jj",
-    poster: "https://www.dropbox.com/scl/fi/2t39nmeee4ijaib0vhcko/04-Cover.webp?rlkey=ieeew0yjsy2p9606hfr0ouqjc&st=yvksscxh&raw=1"
-  },
-  {
     id: "i1",
     type: "image" as const,
-    src: "https://www.dropbox.com/scl/fi/i727omye7ybujgug7ztvy/01-Wallpaper.png?rlkey=ywags5skl0xzkotjkds41u064&st=gp6rfwdn&raw=1"
+    src: "https://www.dropbox.com/scl/fi/743fr6u11rsig6j9nbb48/Agenda-AI-Testemunho-1.webp?rlkey=fsfliwmscvwprcopiys0wgghb&st=z9qp466c&raw=1"
   },
   {
     id: "i2",
     type: "image" as const,
-    src: "https://www.dropbox.com/scl/fi/vqdmtyrirjggnt8oovb8i/02-Wallpaper.png?rlkey=jog3jsgdhkwy04af5w0c6uppv&st=sut2vll5&raw=1"
+    src: "https://www.dropbox.com/scl/fi/kjk619vl57hda33topthb/Agenda-AI-Testemunho-2.webp?rlkey=fsyjs2bvmwkvnzmykesjrzmh1&st=a462z7eq&raw=1"
   },
   {
     id: "i3",
     type: "image" as const,
-    src: "https://www.dropbox.com/scl/fi/8kodh7lddwotjtqqc844i/03-Wallpaper.png?rlkey=a63nd6oyexpvpzp73a1avg6in&st=ubfrz7ux&raw=1"
+    src: "https://www.dropbox.com/scl/fi/0yit8buuhxod5ssk6zn4m/Agenda-AI-Testemunho-3.webp?rlkey=wxxryuzm6rimm8ie9wij5eqpm&st=1mb0g03u&raw=1"
   },
   {
     id: "i4",
     type: "image" as const,
-    src: "https://www.dropbox.com/scl/fi/glhp3tnm5rbkro5aod6vb/04-Wallpaper.png?rlkey=gxd21sqo5xa4uzhiyvp6btc78&st=masufxsy&raw=1"
+    src: "https://www.dropbox.com/scl/fi/ykje7hlsx8m7s00ffo2ob/Agenda-AI-Testemunho-4.webp?rlkey=ego8whss9y2gookobh3tkqqmb&st=ou7srqqy&raw=1"
   },
 ];
 
