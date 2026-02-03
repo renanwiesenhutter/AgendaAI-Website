@@ -1681,7 +1681,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                 </div>
               </a>
             
-              {/* Powered by Dalzzen */}
+              {/* Powered Dalzzen */}
               <div className="mt-2 flex items-center space-x-1 text-xs text-gray-500">
                 <span>Created by</span>
                 <span className="flex items-baseline group cursor-default">
