@@ -495,22 +495,22 @@ const depoItems = [
   {
     id: "i1",
     type: "image" as const,
-    src: "https://www.dropbox.com/scl/fi/743fr6u11rsig6j9nbb48/Agenda-AI-Testemunho-1.webp?rlkey=fsfliwmscvwprcopiys0wgghb&st=z9qp466c&raw=1"
+    src: "/images/Testemunho1.webp"
   },
   {
     id: "i2",
     type: "image" as const,
-    src: "https://www.dropbox.com/scl/fi/kjk619vl57hda33topthb/Agenda-AI-Testemunho-2.webp?rlkey=fsyjs2bvmwkvnzmykesjrzmh1&st=a462z7eq&raw=1"
+    src: "/images/Testemunho2.webp"
   },
   {
     id: "i3",
     type: "image" as const,
-    src: "https://www.dropbox.com/scl/fi/0yit8buuhxod5ssk6zn4m/Agenda-AI-Testemunho-3.webp?rlkey=wxxryuzm6rimm8ie9wij5eqpm&st=1mb0g03u&raw=1"
+    src: "/images/Testemunho3.webp"
   },
   {
     id: "i4",
     type: "image" as const,
-    src: "https://www.dropbox.com/scl/fi/ykje7hlsx8m7s00ffo2ob/Agenda-AI-Testemunho-4.webp?rlkey=ego8whss9y2gookobh3tkqqmb&st=ou7srqqy&raw=1"
+    src: "/images/Testemunho4.webp"
   },
 ];
 
@@ -890,7 +890,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                       {/* Poster (imagem por cima até o vídeo carregar) */}
                       <img
                         id="mockup-poster"
-                        src="https://www.dropbox.com/scl/fi/ku1zvvw7ird9y4klnyput/Mockup-Cover.webp?rlkey=tq6txw6dahhio75ivh870t0c8&st=8mlpfhcq&raw=1"
+                        src="/images/MockupCover.webp"
                         alt="Poster do vídeo"
                         className="absolute inset-0 w-full h-full object-cover rounded-[2.5rem] z-10 select-none pointer-events-none"
                         loading="lazy"
@@ -926,7 +926,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                           document.getElementById("mockup-loader")?.classList.add("hidden");
                         }}
                       >
-                        <source src="https://dl.dropboxusercontent.com/scl/fi/s1j0ytva5ffmeu49t2ap9/Mockup-Video.mp4?rlkey=1wvspc4mvrvmxocloediz5pwh&st=4sgpqjo2"/>
+                        <source src="/videos/MockupVideo.mp4"/>
                         Seu navegador não suporta vídeo.
                       </video>
                     </div>
@@ -1016,11 +1016,11 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                 <AutoPlayVideo
                 id="v1"
                 group="steps"
-                src="https://dl.dropboxusercontent.com/scl/fi/l2898pyua9ry1mtxypxpe/01-Video.mp4?rlkey=6rrt1hzt6528y8g0ec7f5ejpg&st=zv4axuyg"
+                src="/videos/Video1.mp4"
                 playThreshold={0.4}
                 margin="-30% 0px -30% 0px"
                 preload="metadata"
-                poster="https://www.dropbox.com/scl/fi/1kwzzryskicc1qezahnut/01-Cover.webp?rlkey=mjipk1tx3pxyr8tvil8iun38t&st=riw8my4n&raw=1"
+                poster="/images/VideoCover1.webp"
                 className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"/>
                   </div>
                 </div>
@@ -1035,11 +1035,11 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                 <AutoPlayVideo
                 id="v2"
                 group="steps"
-                src="https://dl.dropboxusercontent.com/scl/fi/ydhta8ez80pe40zscxld0/02-Video.mp4?rlkey=hv3xim9grqju3ov77bpvo5uod&st=83p8rvce"
+                src="/videos/Video2.mp4"
                 playThreshold={0.4}
                 margin="-30% 0px -30% 0px"
                 preload="metadata"
-                poster="https://www.dropbox.com/scl/fi/j38tvhdrig3hcag49fyx2/02-Cover.webp?rlkey=x41qx2cgobvr23txggrwm2ovk&st=kl4qzrkk&raw=1"
+                poster="/images/VideoCover2.webp"
                 className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"/>
                   </div>
                 </div>
@@ -1107,11 +1107,11 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                 <AutoPlayVideo
                 id="v3"
                 group="steps"
-                src="https://dl.dropboxusercontent.com/scl/fi/hyvngtp0bik0qhjl2r5a6/03-Video.mp4?rlkey=toc1p10pboahgnoiu5xyi398d&st=k8eske51"
+                src="/videos/Video3.mp4"
                 playThreshold={0.4}
                 margin="-30% 0px -30% 0px"
                 preload="metadata"
-                poster="https://www.dropbox.com/scl/fi/zavay6564o3eh8ec1l3rc/03-Cover.webp?rlkey=8gfbqg11wt6dg985k4b88nlot&st=2e7bqbaz&raw=1"
+                poster="/images/VideoCover3.webp"
                 className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"/>
                   </div>
                 </div>
@@ -1126,11 +1126,11 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                 <AutoPlayVideo
                 id="v4"
                 group="steps"
-                src="https://dl.dropboxusercontent.com/scl/fi/4qqo8l3ehrhanjf4spezh/04-Video.mp4?rlkey=tqekzdg2abffhisux0o3nqojp&st=vetom8jj"
+                src="/videos/Video4.mp4"
                 playThreshold={0.4}
                 margin="-30% 0px -30% 0px"
                 preload="metadata"
-                poster="https://www.dropbox.com/scl/fi/2t39nmeee4ijaib0vhcko/04-Cover.webp?rlkey=ieeew0yjsy2p9606hfr0ouqjc&st=yvksscxh&raw=1"
+                poster="/images/VideoCover4.webp"
                 className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"/>
                   </div>
                 </div>
