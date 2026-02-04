@@ -455,17 +455,46 @@ const depoItems = [
 ];
 
 const trackRef = React.useRef<HTMLDivElement>(null);
+const isAutoScrolling = React.useRef(false);
+const snapRestoreTimer = React.useRef<number | null>(null);
 const [currentIdx, setCurrentIdx] = React.useState(0);
 
 // centraliza o card de índice "idx" (no array expandido) dentro do trilho
 const centerByIndex = React.useCallback((idx: number, smooth: boolean) => {
   const track = trackRef.current;
   if (!track) return;
+
   const cards = track.querySelectorAll<HTMLElement>(".card");
   const el = cards[idx];
   if (!el) return;
+
   const left = el.offsetLeft - (track.clientWidth - el.clientWidth) / 2;
-  track.scrollTo({ left: Math.max(0, left), behavior: smooth ? "smooth" : "auto" });
+  const targetLeft = Math.max(0, left);
+
+  // cancela restauração anterior
+  if (snapRestoreTimer.current) {
+    window.clearTimeout(snapRestoreTimer.current);
+    snapRestoreTimer.current = null;
+  }
+
+  // Quando for scroll programático suave, desligar snap temporariamente evita “briga” no iOS
+  if (smooth) {
+    isAutoScrolling.current = true;
+
+    // desliga snap (classe continua, mas o inline vence)
+    track.style.scrollSnapType = "none";
+
+    track.scrollTo({ left: targetLeft, behavior: "smooth" });
+
+    // restaura snap depois do smooth (tempo curto e estável)
+    snapRestoreTimer.current = window.setTimeout(() => {
+      track.style.scrollSnapType = ""; // volta a usar o snap definido pelas classes
+      isAutoScrolling.current = false;
+      snapRestoreTimer.current = null;
+    }, 420) as unknown as number;
+  } else {
+    track.scrollTo({ left: targetLeft, behavior: "auto" });
+  }
 }, []);
 
 // inicia já centralizado (inclusive no desktop)
@@ -515,13 +544,12 @@ useEffect(() => {
   };
 }, [fullscreenMedia]);
 
-// --- Travar no card mais próximo após o scroll terminar (SEM loop) ---
+// --- Atualiza o card ativo com base no scroll (SEM forçar snap via JS) ---
 useEffect(() => {
   const track = trackRef.current;
   if (!track) return;
 
   let raf = 0;
-  let idleTimer: number | null = null;
 
   const nearestIndex = () => {
     const cards = track.querySelectorAll<HTMLElement>(".card");
@@ -539,49 +567,25 @@ useEffect(() => {
     return best.i;
   };
 
-  const snapToNearest = () => {
-    const i = nearestIndex();
-    centerByIndex(i, true);
-    setCurrentIdx(i);
-  };
-
   const onScroll = () => {
-    // atualiza o "ativo" em tempo real (sem esperar parar de rolar)
-    if (!raf) {
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        const i = nearestIndex();
-        if (i !== currentIdx) setCurrentIdx(i);
-      });
-    }
-
-    // snap suave quando o usuário para de interagir
-    if (idleTimer) {
-      window.clearTimeout(idleTimer);
-      idleTimer = null;
-    }
-    idleTimer = window.setTimeout(() => {
-      snapToNearest();
-    }, 120) as unknown as number;
-  };
-
-  const onPointerDown = () => {
-    if (idleTimer) {
-      window.clearTimeout(idleTimer);
-      idleTimer = null;
-    }
-  };
+    // se o scroll foi disparado pelos botões/tap (scroll programático), ignora
+    if (isAutoScrolling.current) return;
+  
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      const i = nearestIndex();
+      if (i !== currentIdx) setCurrentIdx(i);
+    });
+  };  
 
   track.addEventListener("scroll", onScroll, { passive: true });
-  track.addEventListener("pointerdown", onPointerDown, { passive: true });
 
   return () => {
     track.removeEventListener("scroll", onScroll as any);
-    track.removeEventListener("pointerdown", onPointerDown as any);
-    if (idleTimer) window.clearTimeout(idleTimer);
     if (raf) cancelAnimationFrame(raf);
   };
-}, [centerByIndex, currentIdx]);
+}, [currentIdx]);
 
 // --- Tap vs Drag (evita abrir/centralizar quando o usuário está arrastando) ---
 const drag = useRef({ startX: 0, startY: 0, moved: false, scrolling: false });
