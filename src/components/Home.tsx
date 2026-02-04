@@ -1626,7 +1626,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
 
               
               {/* Plano Mensal */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-xl transition-shadow relative">
+              <div className="bg-white border border-gray-200 rounded-2xl p-8 md:hover:shadow-xl transition-shadow relative">
                 <div className="text-center">
                   <h3 className="text-2xl font-bold text-gray-900 mb-4">
                     Plano Mensal
@@ -1664,7 +1664,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
               </div>
 
               {/* Plano Anual */}
-              <div className="bg-white border-2 border-blue-200 rounded-2xl p-8 hover:shadow-xl transition-shadow relative">
+              <div className="bg-white border-2 border-blue-200 rounded-2xl p-8 md:hover:shadow-xl transition-shadow relative">
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                   <span className="bg-gradient-to-r from-blue-600 to-green-500 text-white px-6 py-2 rounded-full text-sm font-medium">
                     Mais Popular
@@ -1744,18 +1744,25 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                   >
                     <span className="font-medium text-gray-900">{faq.question}</span>
                     <ChevronDown 
-                      className={`w-5 h-5 text-gray-500 transition-transform ${
+                      className={`w-5 h-5 text-gray-500 transition-transform duration-300 ease-out ${
                         openFAQ === index ? 'rotate-180' : ''
                       }`}
                     />
                   </button>
-                  {openFAQ === index && (
+                  <div
+                    className={`overflow-hidden transition-[max-height,opacity,transform] ${
+                      openFAQ === index
+                        ? 'max-h-[800px] opacity-100 translate-y-0 duration-600 ease-out'
+                        : 'max-h-0 opacity-0 -translate-y-1 duration-800 delay-100 ease-in'
+                    }`}
+                    aria-hidden={openFAQ !== index}
+                  >
                     <div className="px-6 pb-4">
                       <p className="text-gray-700 leading-relaxed whitespace-pre-line">
                         {faq.answer}
                       </p>
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
