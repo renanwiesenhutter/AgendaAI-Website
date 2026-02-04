@@ -1363,8 +1363,8 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                 className="
                   flex gap-4 overflow-x-auto hide-scrollbar
                   pl-4 -mx-4 md:mx-0 md:pl-0
-                  scroll-smooth snap-x snap-mandatory   /* <- antes era proximity */
-                  md:overflow-hidden
+                  scroll-smooth snap-x snap-proximity md:snap-mandatory   /* <- antes era proximity */
+                  md:overflow-hidden touch-pan-x overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [-webkit-overflow-scrolling:touch]
                 "
                 aria-label="Carrossel de depoimentos"
                 style={{
