@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SiYoutube, SiWhatsapp, SiInstagram } from "react-icons/si";
 import { Calendar, MessageCircle, CheckCircle, Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, ChevronLeft, ChevronRight, ChevronDown, X, Menu } from 'lucide-react';
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 function Home() {
   const [fullscreenMedia, setFullscreenMedia] = useState<{ type: 'image' | 'video', src: string } | null>(null);
@@ -10,23 +10,83 @@ function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scrollLockY = useRef(0);
+  const headerBarRef = useRef<HTMLDivElement>(null);
+  const scrollAnimationRef = useRef<number | null>(null);
   const groupPlaying: Record<string, string | null> = {};
   const IS_IOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   // Scroll Para a Seção Correta
-  const HEADER_OFFSET = 20; // ajuste conforme a altura real do seu header
+  const HEADER_OFFSET = 0; // ajuste conforme a altura real do seu header
   const location = useLocation();
-  
+  const navigate = useNavigate();
+
+  const smoothScrollTo = React.useCallback((targetTop: number) => {
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      window.scrollTo(0, targetTop);
+      return;
+    }
+
+    const startTop = window.scrollY;
+    const distance = targetTop - startTop;
+    if (Math.abs(distance) < 1) return;
+
+    if (scrollAnimationRef.current) {
+      cancelAnimationFrame(scrollAnimationRef.current);
+      scrollAnimationRef.current = null;
+    }
+
+    const duration = Math.min(420, Math.max(220, Math.abs(distance) * 0.35));
+    const startTime = performance.now();
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - startTime) / duration);
+      const eased = easeOutCubic(progress);
+      window.scrollTo(0, startTop + distance * eased);
+      if (progress < 1) {
+        scrollAnimationRef.current = requestAnimationFrame(step);
+      } else {
+        scrollAnimationRef.current = null;
+      }
+    };
+
+    scrollAnimationRef.current = requestAnimationFrame(step);
+  }, []);
+
+  const scrollToHash = React.useCallback((hash: string) => {
+    const id = hash.replace("#", "");
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    const header = document.querySelector("header");
+    const baseHeaderHeight = headerBarRef.current?.getBoundingClientRect().height ?? header?.getBoundingClientRect().height ?? 0;
+    const headerOffset = baseHeaderHeight + HEADER_OFFSET;
+    const top = el.getBoundingClientRect().top + window.scrollY - headerOffset;
+    smoothScrollTo(Math.max(0, top));
+  }, [smoothScrollTo]);
+
+  const handleAnchorClick = React.useCallback((event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement;
+    const anchor = target.closest('a');
+    if (!anchor) return;
+    const href = anchor.getAttribute('href');
+    if (!href || !href.startsWith('#')) return;
+
+    event.preventDefault();
+    if (href === location.hash) {
+      scrollToHash(href);
+      return;
+    }
+
+    navigate({ hash: href });
+  }, [location.hash, navigate, scrollToHash]);
+
   useEffect(() => {
     if (location.hash) {
-      const id = location.hash.replace("#", "");
-      const el = document.getElementById(id);
-      if (el) {
-        const top = el.getBoundingClientRect().top + window.scrollY - HEADER_OFFSET;
-        window.scrollTo(0, top); // <- teleporta direto, sem animação
-      }
+      scrollToHash(location.hash);
     }
-  }, [location.hash]);
+  }, [location.hash, scrollToHash]);
 
   // Trava o scroll do body quando abrir um modal fullscreen (imagem/vídeo)
   useEffect(() => {
@@ -681,11 +741,11 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white" onClick={handleAnchorClick}>
       {/* Header - Fixed */}
       <header className="bg-white shadow-[0_4px_20px_-2px_rgba(0,0,0,0.1)] border-b border-gray-100 fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-2">
+          <div className="flex justify-between items-center py-2" ref={headerBarRef}>
             <a href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-600 rounded-lg flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-white" />
@@ -730,34 +790,47 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
         </div>
 
         {/* Mobile Menu Dropdown */}
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-t border-gray-100 shadow-lg">
-            <div className="px-4 py-2 space-y-1">
-              <a 
-                href="#como-funciona" 
-                className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
-                onClick={closeMobileMenu}
-              >
-                Como Funciona
-              </a>
-              <a 
-                href="#depoimentos" 
-                className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
-                onClick={closeMobileMenu}
-              >
-                Avaliações
-              </a>
-              <a 
-                href="#precos" 
-                className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
-                onClick={closeMobileMenu}
-              >
-                Planos
-              </a>
-            </div>
+        <div
+          className={`md:hidden bg-white border-t transition-[max-height,opacity,transform] duration-500 ease-out overflow-hidden ${
+            mobileMenuOpen
+              ? "max-h-64 opacity-100 translate-y-0 border-gray-100 shadow-lg"
+              : "max-h-0 opacity-0 -translate-y-2 border-transparent shadow-none pointer-events-none"
+          }`}
+          aria-hidden={!mobileMenuOpen}
+        >
+          <div className={`px-4 py-2 space-y-1 transition-opacity duration-300 ${mobileMenuOpen ? "opacity-100" : "opacity-0"}`}>
+            <a 
+              href="#como-funciona" 
+              className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
+              onClick={closeMobileMenu}
+            >
+              Como Funciona
+            </a>
+            <a 
+              href="#depoimentos" 
+              className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
+              onClick={closeMobileMenu}
+            >
+              Avaliações
+            </a>
+            <a 
+              href="#precos" 
+              className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
+              onClick={closeMobileMenu}
+            >
+              Planos
+            </a>
           </div>
-        )}
+        </div>
       </header>
+
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 z-40 md:hidden"
+          onClick={closeMobileMenu}
+          aria-hidden="true"
+        />
+      )}
 
       {/* Add padding to account for fixed header */}
       <div className="pt-5">
