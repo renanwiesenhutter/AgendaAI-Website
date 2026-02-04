@@ -9,6 +9,7 @@ function Home() {
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const scrollLockY = useRef(0);
   const groupPlaying: Record<string, string | null> = {};
   const IS_IOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
@@ -26,6 +27,44 @@ function Home() {
       }
     }
   }, [location.hash]);
+
+  // Trava o scroll do body quando abrir um modal fullscreen (imagem/vídeo)
+  useEffect(() => {
+    if (!fullscreenMedia) return;
+
+    // salva posição atual
+    scrollLockY.current = window.scrollY;
+
+    // trava scroll (especialmente iOS)
+    const body = document.body;
+    const prev = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      left: body.style.left,
+      right: body.style.right,
+    };
+
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollLockY.current}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+
+    return () => {
+      // restaura
+      body.style.overflow = prev.overflow;
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.width = prev.width;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+
+      window.scrollTo(0, scrollLockY.current);
+    };
+  }, [fullscreenMedia]);
 
   // Loading Spinner
   function YTSpinner({ size = 44, stroke = 4, className = "" }: { size?: number; stroke?: number; className?: string }) {
@@ -1422,17 +1461,30 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
 
               {/* Modal de imagem fullscreen */}
               {fullscreenMedia && fullscreenMedia.type === "image" && (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[9999] flex items-center justify-center">
+                <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm flex items-center justify-center overscroll-contain">
+                  {/* X fixo na viewport (sempre no canto, não entra no zoom/scroll) */}
                   <button
-                    className="absolute top-6 right-6 text-white text-5xl font-light hover:opacity-80 transition"
                     onClick={() => { setFullscreenMedia(null); setImgLoading(false); }}
+                    className="fixed z-[10000] text-white text-5xl font-light hover:opacity-80 transition"
+                    style={{
+                      top: "max(0.75rem, env(safe-area-inset-top))",
+                      right: "max(0.75rem, env(safe-area-inset-right))",
+                    }}
                     aria-label="Fechar"
                   >
                     ×
                   </button>
 
-                  {/* Wrapper para poder ter overlay em cima da imagem */}
-                  <div className="relative max-w-[90%] max-h-[90%]">
+                  {/* Container com área fixa e padding no topo/direita para não encostar no X */}
+                  <div
+                    className="relative w-[96vw] h-[96vh] flex items-center justify-center"
+                    style={{
+                      paddingTop: "calc(max(0.75rem, env(safe-area-inset-top)) + 2.2rem)",
+                      paddingRight: "calc(max(0.75rem, env(safe-area-inset-right)) + 2.2rem)",
+                      paddingLeft: "calc(max(0.75rem, env(safe-area-inset-right)) + 2.2rem)",
+                      paddingBottom: "0.5rem",
+                    }}                    
+                  >
                     {/* Loading overlay */}
                     {imgLoading && (
                       <div className="absolute inset-0 grid place-items-center bg-black/40 rounded-lg">
@@ -1443,7 +1495,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                     <img
                       src={fullscreenMedia.src}
                       alt="Imagem em fullscreen"
-                      className={`max-w-[90vw] max-h-[90vh] rounded-lg shadow-sm transition-opacity duration-200 ${
+                      className={`max-w-full max-h-full rounded-lg shadow-sm transition-opacity duration-200 ${
                         imgLoading ? "opacity-0" : "opacity-100"
                       }`}
                       onLoad={() => setImgLoading(false)}
