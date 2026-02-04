@@ -36,13 +36,15 @@ function Home() {
       scrollAnimationRef.current = null;
     }
 
-    const duration = Math.min(420, Math.max(220, Math.abs(distance) * 0.35));
+    const duration = Math.min(900, Math.max(420, Math.abs(distance) * 0.6));
     const startTime = performance.now();
-    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+    const easeInOutCubic = (t: number) => t < 0.5
+      ? 4 * t * t * t
+      : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
     const step = (now: number) => {
       const progress = Math.min(1, (now - startTime) / duration);
-      const eased = easeOutCubic(progress);
+      const eased = easeInOutCubic(progress);
       window.scrollTo(0, startTop + distance * eased);
       if (progress < 1) {
         scrollAnimationRef.current = requestAnimationFrame(step);
@@ -742,11 +744,12 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
 
   return (
     <div className="min-h-screen bg-white" onClick={handleAnchorClick}>
+      <div id="top" />
       {/* Header - Fixed */}
       <header className="bg-white shadow-[0_4px_20px_-2px_rgba(0,0,0,0.1)] border-b border-gray-100 fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-2" ref={headerBarRef}>
-            <a href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+            <a href="#top" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-600 rounded-lg flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-white" />
               </div>
@@ -791,14 +794,14 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
 
         {/* Mobile Menu Dropdown */}
         <div
-          className={`md:hidden bg-white border-t transition-[max-height,opacity,transform] duration-500 ease-out overflow-hidden ${
+          className={`md:hidden bg-white border-t transition-[max-height,opacity,transform] duration-700 ease-in-out overflow-hidden ${
             mobileMenuOpen
               ? "max-h-64 opacity-100 translate-y-0 border-gray-100 shadow-lg"
               : "max-h-0 opacity-0 -translate-y-2 border-transparent shadow-none pointer-events-none"
           }`}
           aria-hidden={!mobileMenuOpen}
         >
-          <div className={`px-4 py-2 space-y-1 transition-opacity duration-300 ${mobileMenuOpen ? "opacity-100" : "opacity-0"}`}>
+          <div className={`px-4 py-2 space-y-1 transition-opacity duration-300 ease-in-out ${mobileMenuOpen ? "opacity-100" : "opacity-0"}`}>
             <a 
               href="#como-funciona" 
               className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
