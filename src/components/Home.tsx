@@ -1920,7 +1920,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                 <ul className="space-y-2">
                   <li>
                     <a
-                      href="/"
+                      href="/termos-de-uso"
                       className="font-medium transition-all duration-200 text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-700 hover:from-blue-600 hover:to-green-500"
                     >
                       Termos de uso
@@ -1928,7 +1928,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                   </li>
                   <li>
                     <a
-                      href="/"
+                      href="/politica-de-privacidade"
                       className="font-medium transition-all duration-200 text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-700 hover:from-blue-600 hover:to-green-500"
                     >
                       Política de privacidade

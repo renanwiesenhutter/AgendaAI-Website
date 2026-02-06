@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Calendar, CreditCard, Mail, UserRound, Smartphone, Lock, ChevronDown, Tag, X } from 'lucide-react';
-import { useSearchParams, useLocation } from "react-router-dom";
+import { useSearchParams, useLocation, Link } from "react-router-dom";
 import type { StripeElementsOptions } from '@stripe/stripe-js';
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe, PaymentRequestButtonElement } from "@stripe/react-stripe-js";
@@ -2587,8 +2587,8 @@ React.useEffect(() => {
                 </span>
               </span>
               <span className="w-px h-4 bg-gray-300"></span>
-              <a href="#" className="hover:underline">Termos</a>
-              <a href="#" className="hover:underline">Privacidade</a>
+              <Link to="/termos-de-uso" className="hover:underline">Termos</Link>
+              <Link to="/politica-de-privacidade" className="hover:underline">Privacidade</Link>
             </div>
           </div>
         </section>

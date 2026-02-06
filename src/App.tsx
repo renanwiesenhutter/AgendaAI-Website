@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Home from './components/Home';
 import Checkout from './components/Checkout';
+import TermsOfUse from './components/TermsOfUse';
+import PrivacyPolicy from './components/PrivacyPolicy';
 
 export default function App() {
   const { pathname } = useLocation();
@@ -21,6 +23,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/checkout" element={<Checkout />} />
+      <Route path="/termos-de-uso" element={<TermsOfUse />} />
+      <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
