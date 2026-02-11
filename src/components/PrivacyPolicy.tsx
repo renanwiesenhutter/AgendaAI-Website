@@ -1,5 +1,5 @@
 import { Calendar, ArrowLeft, ShieldCheck } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 type PrivacySection = {
   id: string;
@@ -11,18 +11,18 @@ type PrivacySection = {
 const privacySections: PrivacySection[] = [
   {
     id: 'secao-1',
-    title: '1. Introdução',
+    title: 'Ultimas vez atualizado: 11/02/2026',
     paragraphs: [
       'Esta Política de Privacidade aplica-se ao Agenda AI, um serviço de agendamentos e lembretes operado via WhatsApp. Ela explica como coletamos, usamos, protegemos e compartilhamos suas informações pessoais.',
     ],
   },
   {
     id: 'secao-2',
-    title: '2. Coleta de Informações',
+    title: '1. Coleta de Informações',
     paragraphs: [
-      '2.1 Informações fornecidas pelo usuário:',
+      '1.1 Informações fornecidas pelo usuário:',
       'Coletamos nome, número de WhatsApp e endereço de e-mail. Essas informações são necessárias para criar sua conta, identificar você no atendimento e fornecer os serviços do Agenda AI.',
-      '2.2 Dados de uso:',
+      '1.2 Dados de uso:',
       'As informações sobre compromissos, eventos e solicitações que você nos envia via WhatsApp (por exemplo: título do evento, data/hora, duração, local, observações e mensagens de ajuste/cancelamento) são utilizadas exclusivamente para viabilizar o serviço do Agenda AI, como:',
     ],
     bulletItems: [
@@ -33,12 +33,12 @@ const privacySections: PrivacySection[] = [
   },
   {
     id: 'secao-3',
-    title: '3. Processamento de Pagamentos',
+    title: '2. Processamento de Pagamentos',
     paragraphs: [
-      '3.1 Pagamentos via plataforma de checkout:',
+      '2.1 Pagamentos via plataforma de checkout:',
       'Quando aplicável, os pagamentos do Agenda AI são processados pela Stripe. O Agenda AI não tem acesso a dados sensíveis de pagamento, como informações completas de cartão de crédito.',
       'Podemos receber da Stripe apenas informações necessárias para administrar o serviço, como status do pagamento/assinatura (ex.: aprovado, recusado, cancelado, estornado) e identificadores da transação/cliente.',
-      '3.2 Assinaturas via Apple In‑App Purchase:',
+      '2.2 Assinaturas via Apple In‑App Purchase:',
       'Quando você realiza uma assinatura através de um aplicativo iOS, o pagamento é processado inteiramente pela Apple. O Agenda AI não tem acesso a informações de pagamento, como dados de cartão de crédito. As assinaturas podem ser renovadas automaticamente conforme o plano escolhido.',
       'Você pode gerenciar ou cancelar sua assinatura a qualquer momento em:',
       'Ajustes > [seu nome] > Assinaturas no seu dispositivo iOS.',
@@ -47,7 +47,7 @@ const privacySections: PrivacySection[] = [
   },
   {
     id: 'secao-4',
-    title: '4. Uso e Tratamento dos Dados',
+    title: '3. Uso e Tratamento dos Dados',
     paragraphs: [
       'As informações coletadas são usadas para:',
     ],
@@ -59,38 +59,38 @@ const privacySections: PrivacySection[] = [
   },
   {
     id: 'secao-5',
-    title: '5. Compartilhamento e Divulgação de Dados',
+    title: '4. Compartilhamento e Divulgação de Dados',
     paragraphs: [
-      '5.1 Compartilhamento com terceiros',
+      '4.1 Compartilhamento com terceiros:',
       'Não compartilhamos suas informações pessoais com terceiros, exceto quando necessário para operar o serviço (por exemplo: provedores de infraestrutura e pagamento) ou conforme exigido por lei.',
-      '5.2 Exigências legais',
+      '4.2 Exigências legais:',
       'Em casos de solicitação legal ou judicial, podemos ser obrigados a divulgar informações pessoais, dentro dos limites aplicáveis.',
     ],
   },
   {
     id: 'secao-6',
-    title: '6. Segurança e Proteção dos Dados',
+    title: '5. Segurança e Proteção dos Dados',
     paragraphs: [
       'Implementamos medidas de segurança para proteger suas informações pessoais contra acesso não autorizado, alteração ou destruição. No entanto, nenhum método de transmissão ou armazenamento eletrônico é completamente seguro.',
     ],
   },
   {
     id: 'secao-7',
-    title: '7. Retenção e Exclusão de Dados',
+    title: '6. Retenção e Exclusão de Dados',
     paragraphs: [
       'Retemos suas informações pessoais pelo tempo necessário para fornecer o serviço e conforme exigido para fins legais ou regulatórios. Quando aplicável e mediante solicitação, poderemos excluir ou anonimizar dados, respeitando obrigações legais.',
     ],
   },
   {
     id: 'secao-8',
-    title: '8. Mudanças na Política de Privacidade',
+    title: '7. Mudanças na Política de Privacidade',
     paragraphs: [
       'Esta Política de Privacidade pode ser atualizada periodicamente. Avisaremos sobre quaisquer mudanças substanciais em como tratamos as informações pessoais.',
     ],
   },
   {
     id: 'secao-9',
-    title: '9. Limitação de Responsabilidade',
+    title: '8. Limitação de Responsabilidade',
     paragraphs: [
       'Enquanto nos esforçamos para proteger suas informações pessoais, não podemos garantir sua segurança absoluta. Não somos responsáveis por acessos não autorizados ou outras violações de segurança que escapem ao nosso controle razoável.',
     ],
@@ -98,6 +98,8 @@ const privacySections: PrivacySection[] = [
 ];
 
 export default function PrivacyPolicy() {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-white">
       <header className="bg-white/95 backdrop-blur border-b border-gray-200 sticky top-0 z-40">
@@ -109,13 +111,14 @@ export default function PrivacyPolicy() {
             <span className="text-2xl font-bold text-gray-900">Agenda AI</span>
           </Link>
 
-          <Link
-            to="/"
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Voltar para home
-          </Link>
+            Voltar
+          </button>
         </div>
       </header>
 

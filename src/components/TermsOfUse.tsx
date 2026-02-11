@@ -1,5 +1,5 @@
 import { Calendar, ArrowLeft, ShieldCheck } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 type TermsSection = {
   id: string;
@@ -189,6 +189,8 @@ const sections: TermsSection[] = [
 ];
 
 export default function TermsOfUse() {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-white">
       <header className="bg-white/95 backdrop-blur border-b border-gray-200 sticky top-0 z-40">
@@ -200,13 +202,14 @@ export default function TermsOfUse() {
             <span className="text-2xl font-bold text-gray-900">Agenda AI</span>
           </Link>
 
-          <Link
-            to="/"
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Voltar para home
-          </Link>
+            Voltar
+          </button>
         </div>
       </header>
 
