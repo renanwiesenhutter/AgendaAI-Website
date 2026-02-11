@@ -1,195 +1,355 @@
 import { Calendar, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-type TermsSection = {
-  id: string;
-  title: string;
-  paragraphs: string[];
-  bullets?: string[];
-};
+const termsContent = `Esta plataforma, cujo nome é **AGENDA AI**, é de propriedade e mantida por **Dalzzen**, inscrita no **CNPJ sob o nº 50.888.680/0001-08**, com sede na **Rua Ledoíno José Biavatti, 1816 – Vila Industrial, CEP 85904-260**.
 
-const keyPoints = [
-  'O Agenda AI é uma plataforma de tecnologia para organização de compromissos e lembretes com apoio de inteligência artificial.',
-  'O uso da plataforma depende da aceitação destes Termos e da Política de Privacidade.',
-  'A assinatura pode ter renovação automática, conforme plano contratado, até o cancelamento solicitado pelo titular.',
-  'Serviços de terceiros (como WhatsApp, Google Calendar e gateways de pagamento) podem influenciar disponibilidade e funcionalidades.',
-  'Em situações críticas, o usuário deve validar informações antes de tomar decisões relevantes.',
-];
+Este documento visa prestar informações sobre o modo de utilização da plataforma pelos Usuários e suas ferramentas, condições, nomenclaturas, direitos e deveres. Alertamos que todo o texto deve ser lido com atenção e, caso você não concorde com o conteúdo de nossos termos e/ou aviso de privacidade, não dê prosseguimento à navegação ou a utilização de nossos serviços.
 
-const summaryItems = [
-  '1. Data de disponibilização do texto',
-  '2. Definições e termos técnicos',
-  '3. Serviços e funcionamento da plataforma',
-  '4. Cadastro e elegibilidade dos usuários',
-  '5. Planos, cobrança e renovação automática',
-  '6. Cancelamento, direito de arrependimento e reembolso',
-  '7. Responsabilidades da plataforma',
-  '8. Responsabilidades do usuário',
-  '9. Isenções e limitações de responsabilidade',
-  '10. Regras de conduta e proibições',
-  '11. Propriedade intelectual',
-  '12. Dados pessoais, privacidade e segurança',
-  '13. Suspensão, bloqueio e encerramento de conta',
-  '14. Alterações destes Termos',
-  '15. Lei aplicável, foro e canais de contato',
-];
+---
 
-const sections: TermsSection[] = [
-  {
-    id: 'secao-1',
-    title: '1. Data de disponibilização do texto',
-    paragraphs: ['Esta versão dos Termos e Condições de Uso foi disponibilizada em 06/02/2026.'],
-  },
-  {
-    id: 'secao-2',
-    title: '2. Definições e termos técnicos',
-    paragraphs: [
-      'Para facilitar a interpretação deste documento, os termos abaixo são utilizados com os seguintes significados: Plataforma (Agenda AI), Usuário (pessoa física ou jurídica que utiliza o serviço), Conta (credenciais de acesso), Integrações (serviços de terceiros conectados à Plataforma) e Conteúdo (informações enviadas pelo Usuário).',
-      'Sempre que houver referência a “nós”, “nosso” ou “Agenda AI”, entende-se a equipe responsável pela operação da plataforma. Sempre que houver referência a “você” ou “Usuário”, entende-se o titular da conta e/ou responsável legal.',
-    ],
-  },
-  {
-    id: 'secao-3',
-    title: '3. Serviços e funcionamento da plataforma',
-    paragraphs: [
-      'O Agenda AI oferece recursos para criação, edição, organização e lembretes de compromissos por meios digitais, incluindo interação por mensagens e automações com inteligência artificial.',
-      'A plataforma pode aceitar entradas em formatos como texto, áudio e outros suportados tecnicamente no momento do uso, podendo interpretar e estruturar essas informações em eventos e lembretes.',
-      'O serviço possui natureza tecnológica e de produtividade. Ele não substitui serviços profissionais especializados, não presta consultoria individual obrigatória e não deve ser tratado como ferramenta única para decisões críticas.',
-    ],
-    bullets: [
-      '3.1. Funcionalidades podem ser alteradas, aprimoradas ou descontinuadas conforme evolução do produto.',
-      '3.2. Integrações externas podem apresentar limitações técnicas, atrasos, falhas ou indisponibilidade.',
-      '3.3. A interpretação por IA pode conter imprecisões e requer validação do usuário quando necessário.',
-    ],
-  },
-  {
-    id: 'secao-4',
-    title: '4. Cadastro e elegibilidade dos usuários',
-    paragraphs: [
-      'Para utilizar recursos do Agenda AI, você poderá precisar criar conta e fornecer dados de identificação e contato corretos, completos e atualizados.',
-      'Você declara possuir capacidade legal para contratar o serviço ou estar devidamente representado por responsável legal, quando aplicável.',
-    ],
-    bullets: [
-      '4.1. O usuário é responsável pela guarda de senhas, aparelhos e canais de autenticação.',
-      '4.2. É vedado compartilhar credenciais com terceiros sem controle de segurança.',
-      '4.3. Qualquer uso realizado na conta será presumido como de responsabilidade do titular, até comunicação de incidente ao suporte.',
-    ],
-  },
-  {
-    id: 'secao-5',
-    title: '5. Planos, cobrança e renovação automática',
-    paragraphs: [
-      'O acesso aos recursos pagos do Agenda AI depende de assinatura ativa. Valores, periodicidade, condições promocionais e meios de pagamento são exibidos no checkout ou página oficial de planos.',
-      'Ao contratar um plano recorrente, você autoriza cobranças periódicas conforme o ciclo selecionado, inclusive por parceiros de pagamento independentes.',
-      'A ausência de pagamento, recusa da operadora, expiração do meio de pagamento ou suspeita de fraude pode impedir a ativação, renovação ou continuidade da assinatura.',
-    ],
-    bullets: [
-      '5.1. Assinaturas podem ser mensais, anuais ou em outro formato informado no momento da contratação.',
-      '5.2. Preços e condições futuras podem ser alterados para novos ciclos, com comunicação prévia quando exigida por lei.',
-      '5.3. O Agenda AI não armazena integralmente dados sensíveis de cartão quando processados por gateways especializados.',
-    ],
-  },
-  {
-    id: 'secao-6',
-    title: '6. Cancelamento, direito de arrependimento e reembolso',
-    paragraphs: [
-      'O titular pode solicitar cancelamento da renovação automática a qualquer momento pelos canais e interfaces disponibilizados. O cancelamento interrompe renovações futuras e, em regra, mantém o acesso até o fim do ciclo já pago.',
-      'Quando houver direito de arrependimento legal (incluindo hipóteses do Código de Defesa do Consumidor), o pedido deverá ser feito no prazo legal aplicável, observadas as regras do canal de contratação.',
-      'Assinaturas contratadas por lojas de aplicativos ou parceiros externos podem seguir políticas próprias de estorno e cancelamento, sob responsabilidade operacional da respectiva plataforma de pagamento.',
-    ],
-  },
-  {
-    id: 'secao-7',
-    title: '7. Responsabilidades da plataforma',
-    paragraphs: [
-      'O Agenda AI envida esforços razoáveis para manter ambiente estável, seguro e funcional, além de promover melhorias contínuas, correções e suporte compatíveis com a natureza do serviço.',
-      'Também buscamos comunicar mudanças relevantes de forma clara nos canais oficiais, especialmente quando impactarem cobrança, privacidade, funcionalidades essenciais ou regras de uso.',
-    ],
-  },
-  {
-    id: 'secao-8',
-    title: '8. Responsabilidades do usuário',
-    paragraphs: ['Ao utilizar o serviço, você concorda em agir com boa-fé, observar a legislação aplicável e respeitar estes Termos.'],
-    bullets: [
-      '8.1. Fornecer informações verdadeiras, completas e atualizadas.',
-      '8.2. Revisar e confirmar compromissos importantes antes de agir com base em automações.',
-      '8.3. Manter seu ambiente digital seguro (sistema, navegador, antivírus e rede).',
-      '8.4. Utilizar a plataforma apenas para finalidades lícitas e legítimas.',
-      '8.5. Não atribuir ao Agenda AI responsabilidades por dados incorretos inseridos pelo próprio usuário.',
-    ],
-  },
-  {
-    id: 'secao-9',
-    title: '9. Isenções e limitações de responsabilidade',
-    paragraphs: [
-      'Dentro dos limites legais, o Agenda AI não se responsabiliza por prejuízos decorrentes de uso indevido da conta, indisponibilidade de terceiros, falhas de conexão, eventos de força maior, ou decisões tomadas sem validação adequada das informações.',
-      'A plataforma também não garante resultado específico de produtividade, ganho financeiro, cumprimento de metas pessoais ou eliminação completa de esquecimentos, pois esses resultados dependem de múltiplos fatores externos e conduta do usuário.',
-    ],
-    bullets: [
-      '9.1. Não há garantia de disponibilidade ininterrupta do serviço.',
-      '9.2. Integrações de terceiros podem falhar parcial ou integralmente.',
-      '9.3. Limitações técnicas de IA podem gerar interpretações incompletas.',
-      '9.4. Danos indiretos e lucros cessantes poderão ser limitados conforme a legislação aplicável.',
-    ],
-  },
-  {
-    id: 'secao-10',
-    title: '10. Regras de conduta e proibições',
-    paragraphs: ['É proibido utilizar o Agenda AI para atividades abusivas, fraudulentas, ilegais ou que violem direitos de terceiros.'],
-    bullets: [
-      '10.1. Não praticar invasão, engenharia reversa, teste de vulnerabilidade sem autorização ou tentativa de burlar mecanismos de segurança.',
-      '10.2. Não enviar conteúdo ilícito, ofensivo, discriminatório, malicioso ou que viole direitos autorais e de personalidade.',
-      '10.3. Não usar a infraestrutura da plataforma para spam, phishing, fraude, automação abusiva ou desinformação.',
-      '10.4. Não reproduzir, vender, sublicenciar ou explorar comercialmente recursos do Agenda AI sem autorização formal.',
-    ],
-  },
-  {
-    id: 'secao-11',
-    title: '11. Propriedade intelectual',
-    paragraphs: [
-      'A titularidade da marca Agenda AI, identidade visual, software, fluxos, bases de dados, layouts, textos e demais elementos da plataforma pertence aos respectivos titulares e é protegida pela legislação nacional e internacional de propriedade intelectual.',
-      'A autorização de uso concedida ao usuário é pessoal, limitada, revogável e não exclusiva, exclusivamente para acesso e utilização legítima do serviço.',
-    ],
-  },
-  {
-    id: 'secao-12',
-    title: '12. Dados pessoais, privacidade e segurança',
-    paragraphs: [
-      'O tratamento de dados pessoais segue a Política de Privacidade do Agenda AI, que integra estes Termos para todos os efeitos.',
-      'Adotamos medidas técnicas e organizacionais para proteção de dados, sem prejuízo de riscos residuais inerentes ao ambiente digital e às integrações com terceiros.',
-      'Ao utilizar o serviço, você concorda com o tratamento necessário de dados para execução contratual, suporte, prevenção a fraudes, segurança e cumprimento de obrigações legais.',
-    ],
-  },
-  {
-    id: 'secao-13',
-    title: '13. Suspensão, bloqueio e encerramento de conta',
-    paragraphs: [
-      'O Agenda AI poderá suspender, restringir ou encerrar contas em caso de violação destes Termos, inadimplência, indício de fraude, risco à segurança, ordem judicial/administrativa ou uso que comprometa a plataforma.',
-      'Sempre que tecnicamente possível e juridicamente permitido, serão apresentados meios para regularização ou contestação.',
-    ],
-  },
-  {
-    id: 'secao-14',
-    title: '14. Alterações destes Termos',
-    paragraphs: [
-      'Podemos atualizar estes Termos para refletir mudanças de produto, operação, segurança, exigências legais e evolução tecnológica.',
-      'A continuidade de uso após a publicação da nova versão caracteriza concordância, salvo hipóteses em que a lei exija consentimento específico.',
-      'A data de atualização será sempre exibida nesta página para facilitar o controle das versões vigentes.',
-    ],
-  },
-  {
-    id: 'secao-15',
-    title: '15. Lei aplicável, foro e canais de contato',
-    paragraphs: [
-      'Estes Termos são regidos pela legislação da República Federativa do Brasil.',
-      'As partes elegem o foro legalmente competente, observando-se as normas de proteção ao consumidor quando aplicáveis.',
-      'Para dúvidas, solicitações e comunicações sobre estes Termos, utilize os canais oficiais de atendimento informados no site do Agenda AI.',
-    ],
-  },
-];
+## 1 DATA DE DISPONIBILIZAÇÃO DO TEXTO
+
+1.1 A presente versão deste documento foi disponibilizada em: **11/02/2026**
+
+---
+
+## 2 EXPLICAÇÃO DOS TERMOS TÉCNICOS OU EM LÍNGUA ESTRANGEIRA
+
+2.1 Abaixo estão dispostos os significados das nomenclaturas técnicas e termos na língua inglesa.
+
+**Login:** É o processo que permite o acesso a um sistema informático, controlado por meio de identificação e autenticação do Usuário pelas credenciais fornecidas por esse mesmo internauta.
+
+**Online:** Termo da língua inglesa cujo significado literal é "em linha". É habitualmente usado para designar que um determinado Usuário da internet ou de outra rede de computadores está conectado à rede.
+
+**Usuário(s):** pessoa física ou jurídica que acessa, se cadastra e/ou utiliza os serviços disponibilizados pelo **Agenda AI**.
+
+**Vírus:** Software malicioso que infecta sistemas e computadores, com objetivo de causar algum dano, faz cópias de si mesmo e tenta se espalhar para outros computadores, utilizando-se de diversos meios.
+
+2.2 São os tipos de Usuários da plataforma:
+2.2.1 Usuário Final: Pessoa física que contrata os serviços da plataforma para uso pessoal, utilizando as funcionalidades e recursos do **Agenda AI** no seu dia a dia.
+2.2.2 Usuário Profissional: Pessoa física ou jurídica, como secretarias, profissionais autônomos, clínicas, consultórios, salões, barbearias ou empresas que contrata os serviços da plataforma para disponibilizar o **Agenda AI** a seus clientes/pacientes ou para gerir agendas no âmbito de suas atividades profissionais.
+2.2.3 Estes Usuários, em conjunto, serão chamados apenas de Usuários.
+
+---
+
+## 3 SERVIÇOS
+
+3.1 O que somos: O **Agenda AI** consiste, mas não se limita, em uma plataforma que oferece uma solução tecnológica que permite aos Usuários registrarem, criarem, ajustarem e consultarem compromissos e lembretes por meio do envio de informações em diferentes formatos — como texto e, quando disponível, áudio ou mídia — principalmente via **WhatsApp**, e, quando aplicável, pela área logada do site e/ou outros canais oficiais do serviço. A partir dessas solicitações, nossa ferramenta utiliza recursos de automação e Inteligência Artificial para interpretar comandos, organizar informações e **criar, reagendar, cancelar e consultar eventos**, além de enviar **confirmações e lembretes** relacionados à agenda do Usuário. O objetivo é fornecer uma experiência prática e automatizada de organização de agenda, de forma acessível e intuitiva, sem substituir a responsabilidade do Usuário na validação das informações e decisões tomadas.
+
+3.1.1 O **Agenda AI** poderá, ainda, disponibilizar integrações com aplicativos, sistemas ou serviços de terceiros, incluindo, exemplificativamente, **Google Calendar** e soluções equivalentes (inclusive integrações via convite/compartilhamento de calendário e funcionalidades similares), com a finalidade de complementar a criação, a sincronização, o registro e a visualização de eventos e lembretes. Tais integrações poderão ser alteradas, ampliadas ou descontinuadas ao longo do tempo, conforme a evolução do serviço, sem que isso implique modificação da natureza da plataforma.
+
+3.1.2 O **Agenda AI** envidará seus melhores esforços para manter estes Termos de Uso atualizados no que se refere às integrações com aplicativos, sistemas, dispositivos ou serviços de terceiros eventualmente disponibilizados ou integrados com a plataforma, incluindo a indicação dos respectivos parceiros. Contudo, em razão da natureza dinâmica dessas integrações, o **Agenda AI** não garante que a relação de serviços parceiros esteja permanentemente completa ou atualizada, não se responsabilizando por eventuais inconsistências temporárias entre as integrações efetivamente disponíveis e as informações constantes nestes Termos.
+
+3.2 Atualmente, oferecemos dois tipos de plano: o plano **Mensal**, voltado para usuários individuais que desejam utilizar o Agenda AI por um período de um mês; e o plano **Anual**, destinado a usuários individuais que desejam contratar o serviço por um período maior, conforme condições e benefícios informados na página de planos/preços.
+
+3.2.1 Não há distinção de funcionalidades entre os planos, sendo que ambos dão acesso às mesmas funcionalidades do **Agenda AI**. A diferença entre eles está apenas no período de uso/ciclo de cobrança (mensal ou anual) e no fato de que o plano Anual pode oferecer teste grátis de 7 (sete) dias, quando disponível, antes do início da cobrança. Os detalhes, valores e eventuais condições promocionais de cada plano constam na página oficial de planos do **Agenda AI**.
+
+3.2.2 Por sua vez, na conta de Usuário Final, as funcionalidades são semelhantes, porém restritas ao próprio titular da conta, permitindo que este acompanhe seus compromissos, estabeleça lembretes e visualize suas próprias informações cadastradas na plataforma.
+
+3.3 Por meio de um chatbot na plataforma terceirizada **WhatsApp** e/ou por meio da área logada do site (quando disponível), o Usuário poderá registrar solicitações de agendamento, reagendamento, cancelamento e consulta de eventos, enviando informações em formato de texto e, quando aplicável, outros formatos suportados. A plataforma utiliza tecnologia de automação e Inteligência Artificial para interpretar os pedidos e executar ações relacionadas à agenda, além de enviar confirmações e lembretes.
+
+3.4 Ao utilizar o **Agenda AI**, o Usuário deve compreender e aceitar que todas as suas ações e escolhas são livres e não possuem nenhum tipo de influência ou ingerência do **Agenda AI**.
+
+3.5 Fica esclarecido que o presente serviço não estabelece entre as partes qualquer vínculo empregatício, societário ou associativo, permanecendo cada parte como única responsável por todas as suas respectivas despesas e encargos, sejam de natureza trabalhista, previdenciária, fiscal, securitária, civil, penal ou de qualquer outra natureza ou espécie.
+
+---
+
+## 4 CADASTRO DOS USUÁRIOS
+
+4.1 Para o cadastro e utilização dos serviços do **Agenda AI** serão requeridas as seguintes informações:
+* Nome
+* E-mail
+* Número de WhatsApp
+
+4.2 Cada Usuário determinará o seu login e senha de acesso (quando aplicável), sendo de sua exclusiva responsabilidade a manutenção do sigilo dessas informações. O **Agenda AI** não se responsabiliza pelas ações e danos que poderão ser causados pelo acesso irregular da conta de acesso por terceiros.
+
+4.3 Os Usuários são responsáveis por fornecer informações verdadeiras, precisas e atualizadas.
+
+4.4 O **Agenda AI** poderá rescindir o contrato com o Usuário, suspender os seus serviços, recusar ou cancelar sem notificação prévia a conta de acesso de um Usuário sempre que suspeitar que as informações fornecidas são falsas, incompletas, desatualizadas ou imprecisas ou, ainda, nos casos de falta de pagamento, nos casos indicados nas leis e regulamentos aplicáveis, nestes Termos de Uso, no Aviso de Privacidade ou em qualquer Política.
+
+---
+
+## 5 PAGAMENTO PELO USO DA PLATAFORMA
+
+5.1 Sim, para utilizar os serviços do **Agenda AI**, pode ser necessário realizar uma assinatura e pagar por ela, conforme o plano contratado.
+
+5.2 No plano destinado ao Usuário Final, o Usuário poderá optar por modalidades de assinatura e ciclos de cobrança definidos na página oficial de planos do **Agenda AI**
+
+5.3 A contratação da assinatura poderá ser realizada de acordo com o tipo de plano contratado pelo Usuário, nos seguintes termos:
+
+5.3.1 Diretamente pelo site, por meio de botão/fluxo de assinatura, que redireciona o usuário para a página de checkout da plataforma de pagamento utilizada pelo **Agenda AI**, que atualmente é a **Stripe**.
+
+5.3.2 O **Agenda AI** não terá acesso aos dados bancários do Usuário. Recomendamos, ainda, a leitura dos Termos de Uso e do Aviso de Privacidade da **Stripe** e/ou de quaisquer lojas de aplicativos utilizadas na contratação.
+
+---
+
+## 6 REEMBOLSO E CANCELAMENTO PELO USUÁRIO
+
+6.1 **Direito de arrependimento:** O **Agenda AI** respeita os direitos de seus Usuários, incluindo o direito de arrependimento previsto no Código de Defesa do Consumidor. O Usuário poderá desistir da contratação no prazo de 07 (sete) dias corridos, contados a partir da confirmação da assinatura. Nesse caso, o valor integral eventualmente pago será reembolsado, desde que o pedido seja formalizado dentro do referido prazo.
+
+6.1.1 Após transcorrido o prazo de 07 (sete) dias mencionado na Cláusula 6.1, não haverá reembolso proporcional dos valores pagos, uma vez que o cancelamento diz respeito apenas à não renovação futura da assinatura, permanecendo os serviços disponíveis até o fim do ciclo contratado.
+
+6.2 O Usuário poderá solicitar o cancelamento da renovação automática da assinatura, a qualquer momento, por meio da área de gerenciamento de assinatura disponível na área logada do site (quando disponível) ou mediante solicitação aos canais de atendimento ao cliente do **Agenda AI**, informados na Cláusula 15. O cancelamento da renovação automática não encerra o plano vigente, que permanecerá ativo até o término do respectivo período contratado.
+
+6.3 O cancelamento da assinatura implica a perda de acesso à plataforma e a todas as funcionalidades disponibilizadas durante o período contratado, incluindo eventual acesso a históricos e informações armazenadas na conta do Usuário.
+
+---
+
+## 7 RESPONSABILIDADES DAS PARTES
+
+7.1 **Responsabilidade do Agenda AI:**
+7.1.1 Realizar os serviços conforme descrito nestes Termos de Uso.
+
+7.1.2 Responsabilizar-se pelo funcionamento e manutenção da plataforma, bem como pelas correções que eventualmente sejam obrigatórias por lei ou regulações.
+
+7.1.3 Informar qualquer alteração dos serviços aos Usuários, por meio de comunicados simples na plataforma.
+
+7.2 **Responsabilidade dos Usuários:**
+7.2.1 Utilizar a plataforma conforme os critérios de utilização definidos pelo **Agenda AI**, sem alterar a sua programação, quebrar senhas ou realizar procedimentos que venham causar prejuízos ao **Agenda AI**, aos demais Usuários e a terceiros.
+
+7.2.2 Responsabilizar-se para todos os efeitos, inclusive jurídicos, pelo teor das informações que introduzir e pelos compromissos que assumir na plataforma.
+
+7.2.3 Respeitar integralmente estes Termos de Uso, Aviso de Privacidade, legislação vigente e contratos entre as partes.
+
+7.2.4 Fornecer e manter informações exatas, corretas, precisas, verdadeiras, atuais e completas, eximindo o **Agenda AI** de qualquer responsabilidade nesse sentido.
+
+7.2.5 Manter o sigilo das credenciais de acesso à plataforma, responsabilizando-se por todo uso indevido decorrente de sua divulgação a terceiros.
+
+7.2.6 Adotar boas práticas na criação de senha de acesso; não compartilhar dados com terceiros, como logins e senhas; utilizar senhas fortes; não utilizar a senha do **Agenda AI** em outros sites ou serviços, trocando-a periodicamente.
+
+7.2.7 Conhecer plenamente o funcionamento da plataforma, bem como os custos envolvidos na sua utilização, sendo que o Usuário deve ter plena capacidade e competência para a utilização.
+
+7.2.8 Manter o sistema operacional, navegador e antivírus atualizados, garantindo a segurança do ambiente utilizado para acesso ao **Agenda AI**.
+
+7.2.9 Reconhecer que o **Agenda AI** é uma plataforma de tecnologia voltada à **organização de agenda** e ao **envio de lembretes** com base nas informações fornecidas pelos próprios Usuários, não se tratando de serviço profissional regulamentado, consultoria ou acompanhamento especializado.
+
+7.2.10 Reconhecer que o envio de mensagens, e eventuais mídias, no âmbito da utilização do **Agenda AI**, seja por meio do WhatsApp ou da área logada do site, ocorre exclusivamente para a finalidade de **organização de compromissos e lembretes**, sendo vedado qualquer uso diverso daquele previsto na plataforma.
+
+---
+
+## 8 ISENÇÃO DE RESPONSABILIDADE DO AGENDA AI
+
+8.1 O **Agenda AI** não se responsabiliza por:
+8.1.1 Eventual indisponibilidade da plataforma, a qual não tenha dado causa.
+
+8.1.2 Condutas dos Usuários e pelo descumprimento de suas obrigações.
+
+8.1.3 Inserção de informações falsas, incompletas e/ou desatualizadas pelos Usuários.
+
+8.1.4 Danos que o Usuário possa experimentar por ações exclusivas de terceiros, bem como falhas na conexão de rede e interações maliciosas, por exemplo, vírus e outros malwares.
+
+8.1.5 Danos que o Usuário possa ter em decorrência do mau uso da plataforma em desconformidade com estes Termos, com o Aviso de Privacidade, com a lei ou ordens judiciais.
+
+8.1.6 Casos fortuitos ou de força maior.
+
+8.1.7 Pelas condutas ilícitas realizadas por Usuários durante o uso da plataforma (ex: fraudes).
+
+8.1.8 Erros de informação fornecida pelo Usuário (ex.: data/hora/local incorretos) e consequências decorrentes desses dados.
+
+8.1.9 Resultados obtidos ou não obtidos com base nos objetivos pessoais ou profissionais dos Usuários, como organização de rotina, pontualidade, comparecimento a compromissos, conversões, desempenho de atendimento ou similares.
+
+8.1.10 Eventual indisponibilidade, instabilidade, falhas técnicas ou quaisquer problemas oriundos das plataformas de terceiros utilizadas, incluindo o **WhatsApp** e a **Stripe**, sendo estas ferramentas externas ao **Agenda AI**.
+
+8.1.11 Erros no envio, recepção ou interpretação de mensagens, áudios, imagens, vídeos ou textos enviados pelo Usuário no contexto do **Agenda AI**.
+
+8.1.12 Respostas, interpretações, confirmações ou automações geradas por inteligência artificial, cujos resultados dependem dos dados fornecidos e dos parâmetros técnicos do modelo de IA utilizado, não se tratando de garantia de comparecimento, pontualidade ou resultado.
+
+8.1.13 Ações, omissões, políticas de privacidade e segurança, falhas técnicas ou quaisquer outras questões relacionadas a plataformas de terceiros integradas ou utilizadas no contexto do **Agenda AI**, cujos serviços são regidos por seus próprios Termos de Uso. Recomendamos que, antes de usar a plataforma, você leia os Termos de Uso e Aviso de Privacidade desses terceiros.
+
+---
+
+## 9 REGRAS DE CONDUTA E PROIBIÇÕES
+
+9.1 Os Usuários não podem:
+9.1.1 Lesar direitos do **Agenda AI**, dos operadores da plataforma, de outros Usuários, de terceiros ou agir sob qualquer meio ou forma que possa contribuir com tal violação.
+
+9.1.2 Executar atos que limitem ou impeçam a utilização da plataforma ou acessar ilicitamente o **Agenda AI**.
+
+9.1.3 Utilizar a ferramenta para praticar ações ilícitas e difundir mensagens não relacionadas com a plataforma ou com suas finalidades, incluindo mensagens com conteúdo impróprio.
+
+9.1.4 Inserir dados que sejam falsos, desatualizados ou incompletos.
+
+9.1.5 Responsabilizar o **Agenda AI** por condutas de Usuários que estejam cadastrados na plataforma ou de terceiros.
+
+9.1.6 Alterar a sua programação, quebrar senhas ou realizar procedimentos que venham causar prejuízos ao **Agenda AI**, aos demais Usuários ou terceiros.
+
+9.1.7 Atribuir ao **Agenda AI** qualquer responsabilidade pelo não cumprimento, integral ou parcial, de metas, planos pessoais, objetivos profissionais ou de qualquer outra natureza.
+
+9.1.8 Exigir do **Agenda AI** a prestação de serviços que extrapolem o escopo do serviço contratado, tais como os não previsto nos planos ofertados.
+
+9.1.9 Imputar ao **Agenda AI** responsabilidade por atos, omissões, falhas ou políticas adotadas por empresas terceirizadas, incluindo, mas não se limitando, às plataformas de comunicação e pagamento utilizadas no funcionamento da solução tecnológica.
+
+9.2 O **Agenda AI** poderá, a seu exclusivo critério, bloquear, restringir, desabilitar ou impedir o acesso de qualquer Usuário à plataforma sempre que for detectada uma conduta inadequada, sem necessidade de aviso prévio ou direito a qualquer tipo de compensação.
+
+---
+
+## 10 PROPRIEDADE INTELECTUAL
+
+10.1 A titularidade e os direitos relativos à plataforma pertencem exclusivamente a **Dalzzen**. O acesso à plataforma e a sua regular utilização pelo Usuário não lhe conferem qualquer direito ou prerrogativa sobre propriedade intelectual ou outro conteúdo nela inserido.
+
+10.2 Todo o conteúdo da plataforma, incluindo nome, marca, domínio, programas, bases de dados, arquivos, textos, desenhos, fotos, layouts, cabeçalhos e demais elementos, foi criado, desenvolvido ou cedido à **Dalzzen**, sendo, portanto, de propriedade exclusiva da empresa ou a ela licenciado e encontra-se protegido pelas leis brasileiras e tratados internacionais que versam sobre direitos de propriedade intelectual.
+
+10.3 São proibidas: a exploração, cessão, imitação, cópia, plágio, aplicação de engenharia reversa, tentativa de invasão (hackear), armazenamento, alteração, modificação de características, ampliação, venda, locação, doação, alienação, transferência, reprodução, integral ou parcial, de qualquer conteúdo da plataforma do **Agenda AI**.
+
+10.4 A pessoa que violar as proibições contidas na legislação sobre propriedade intelectual e nestes Termos será responsabilizada civil e criminalmente pelas infrações cometidas, além de poder ser penalizada na plataforma.
+
+---
+
+## 11 TRATAMENTO DE DADOS PESSOAIS, PRIVACIDADE E SEGURANÇA
+
+11.1 O **Agenda AI** dispõe de uma política específica para regular a coleta, guarda e tratamento de dados pessoais, bem como a sua segurança: o **Aviso/Política de Privacidade**. O Aviso de Privacidade integra inseparavelmente estes Termos, ressaltando-se que os dados de utilização da plataforma serão arquivados nos termos da legislação em vigor.
+
+---
+
+## 12 DESDOBRAMENTOS DO ACESSO À PLATAFORMA
+
+12.1 Apesar dos melhores esforços do **Agenda AI** para fornecer as melhores tecnologias para manter a conexão e sincronização online e acesso seguro aos Usuários, em virtude de dificuldades técnicas, aplicações de internet ou problemas de transmissão, é possível ocorrer cópias inexatas ou incompletas das informações contidas na plataforma.
+
+12.1.1 O **Agenda AI** recomenda a instalação de antivírus ou protetores adequados, bem como a constante atualização do sistema operacional, navegador e antivírus, garantindo a segurança do ambiente utilizado para acesso à plataforma.
+
+12.2 O **Agenda AI** se reserva o direito de unilateralmente modificar a plataforma, bem como a configuração, a apresentação, o desenho, o conteúdo, as funcionalidades, as ferramentas ou qualquer outro elemento, inclusive o seu cancelamento.
+
+12.3 Nossa plataforma pode conter links de sites/plataformas de terceiros. Ao seguir um link, o Usuário deve verificar os avisos de privacidade desses sites/plataformas, pois não aceitamos qualquer responsabilidade ou obrigação por essas políticas. Por favor, verifique essas políticas antes de compartilhar quaisquer dados pessoais com esses sites.
+
+---
+
+## 13 ALTERAÇÕES DOS TERMOS DE USO
+
+13.1 O **Agenda AI** poderá unilateralmente adicionar e/ou modificar qualquer cláusula contida nestes Termos de Uso. A versão atualizada valerá para o uso da plataforma a partir de sua publicação. A continuidade de acesso ou utilização da plataforma, depois da divulgação, confirmará a vigência dos novos Termos de Uso pelos Usuários.
+
+13.2 Caso a mudança efetuada necessite de consentimento do Usuário, será apresentada a opção de aceitar de forma livre, inequívoca e informada o novo texto ou recusá-lo.
+
+13.3 Caso o Usuário não esteja de acordo com a alteração, poderá não fornecer consentimento para atos específicos ou poderá rescindir totalmente seu vínculo com o **Agenda AI**. No entanto, essa rescisão não eximirá o Usuário de cumprir com todas as obrigações assumidas sob as versões precedentes dos Termos de Uso.
+
+---
+
+## 14 LEI APLICÁVEL E FORO DE ELEIÇÃO
+
+14.1 A plataforma é controlada e administrada na cidade de **Toledo/PR**, Brasil, podendo ser acessada por qualquer dispositivo conectado à Internet, independentemente de sua localização geográfica.
+
+14.1.1 As pessoas que acessam ou usam o **Agenda AI** a partir de outros países o fazem por conta própria e são responsáveis pelo cumprimento das leis regionais/nacionais.
+
+14.2 O Usuário concorda que a legislação aplicável para fins destes Termos e Condições de Uso e do Aviso de Privacidade será a vigente na República Federativa do Brasil.
+
+14.3 O **Agenda AI** e o Usuário concordam que o Foro de **Toledo/PR**, Brasil, será o único competente para dirimir qualquer questão ou controvérsia oriunda ou resultante do uso da plataforma, renunciando expressamente qualquer outro, por mais privilegiado que seja ou venha a ser.
+
+---
+
+## 15 CONTATO
+
+15.1 O **Agenda AI** disponibiliza os seguintes canais para receber todas as comunicações que os Usuários desejarem fazer:
+
+* WhatsApp no número: **+5545991453366**
+* e-mail: **[agendaai@dalzzen.com](mailto:agendaai@dalzzen.com)**`;
+
+type TermsBlock =
+  | { type: 'h1'; text: string }
+  | { type: 'h2'; text: string }
+  | { type: 'p'; text: string }
+  | { type: 'hr' }
+  | { type: 'ul'; items: string[] };
+
+function parseTermsBlocks(content: string): TermsBlock[] {
+  const blocks: TermsBlock[] = [];
+  const lines = content.split('\n');
+  let currentList: string[] = [];
+
+  const flushList = () => {
+    if (currentList.length > 0) {
+      blocks.push({ type: 'ul', items: currentList });
+      currentList = [];
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushList();
+      continue;
+    }
+
+    if (line === '---') {
+      flushList();
+      blocks.push({ type: 'hr' });
+      continue;
+    }
+
+    if (line.startsWith('## ')) {
+      flushList();
+      blocks.push({ type: 'h2', text: line.slice(3) });
+      continue;
+    }
+
+    if (line.startsWith('# ')) {
+      flushList();
+      blocks.push({ type: 'h1', text: line.slice(2) });
+      continue;
+    }
+
+    if (line.startsWith('* ')) {
+      currentList.push(line.slice(2));
+      continue;
+    }
+
+    flushList();
+    blocks.push({ type: 'p', text: line });
+  }
+
+  flushList();
+  return blocks;
+}
+
+function renderInline(text: string) {
+  const parts: Array<JSX.Element | string> = [];
+  const regex = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^\)]+\))/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null = regex.exec(text);
+
+  while (match) {
+    const [token] = match;
+    const start = match.index;
+
+    if (start > lastIndex) {
+      parts.push(text.slice(lastIndex, start));
+    }
+
+    if (token.startsWith('**') && token.endsWith('**')) {
+      parts.push(<strong key={`bold-${start}`}>{renderInline(token.slice(2, -2))}</strong>);
+    } else {
+      const linkMatch = token.match(/^\[([^\]]+)\]\(([^\)]+)\)$/);
+      if (linkMatch) {
+        const [, label, href] = linkMatch;
+        parts.push(
+          <a
+            key={`link-${start}`}
+            href={href}
+            target={href.startsWith('http') ? '_blank' : undefined}
+            rel={href.startsWith('http') ? 'noreferrer' : undefined}
+            className="text-blue-700 hover:text-blue-900 underline break-all"
+          >
+            {label}
+          </a>
+        );
+      } else {
+        parts.push(token);
+      }
+    }
+
+    lastIndex = start + token.length;
+    match = regex.exec(text);
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+}
 
 export default function TermsOfUse() {
   const navigate = useNavigate();
+  const blocks = parseTermsBlocks(termsContent);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-white">
@@ -220,58 +380,49 @@ export default function TermsOfUse() {
               <ShieldCheck className="w-4 h-4" />
               Documento legal
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold leading-tight">Termos e Condições de Uso</h1>
-            <p className="mt-3 text-blue-100 text-base sm:text-lg">
-              Leia com atenção as regras de acesso, assinatura e utilização da plataforma Agenda AI.
-            </p>
-            <p className="mt-4 text-sm text-blue-100">Última atualização: 06 de fevereiro de 2026</p>
+            <h1 className="text-3xl sm:text-4xl font-bold leading-tight">Termos e Condições <p></p> de Uso Agenda AI</h1>
+            <p className="mt-4 text-sm text-blue-100">Última atualização: 11 de fevereiro de 2026</p>
           </div>
 
           <div className="px-6 sm:px-10 py-8 sm:py-10">
-            <article className="bg-blue-50 border border-blue-100 rounded-2xl p-5 sm:p-6">
-              <h2 className="text-lg sm:text-xl font-semibold text-blue-900 mb-3">Como funciona esta plataforma</h2>
-              <ul className="list-disc pl-5 space-y-2 text-blue-900/90">
-                {keyPoints.map((point, index) => (
-                  <li key={`point-${index}`} className="leading-relaxed">
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            </article>
+            <div className="space-y-5 sm:space-y-6">
+              {blocks.map((block, index) => {
+                if (block.type === 'h1') {
+                  return (
+                    <h2 key={`block-${index}`} className="text-2xl sm:text-3xl font-bold text-gray-900">
+                      {renderInline(block.text)}
+                    </h2>
+                  );
+                }
 
-            <article className="mt-8 sm:mt-10 mb-24 sm:mb-28 bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 mb-8">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3">Conteúdo destes Termos</h2>
-              <ul className="list-disc pl-5 space-y-2 text-gray-700 leading-relaxed">
-                {summaryItems.map((item, index) => (
-                  <li key={`summary-${index}`}>{item}</li>
-                ))}
-              </ul>
-            </article>
+                if (block.type === 'h2') {
+                  return (
+                    <h3 key={`block-${index}`} className="text-xl sm:text-2xl font-semibold text-gray-900 pt-2">
+                      {renderInline(block.text)}
+                    </h3>
+                  );
+                }
 
-            <div className="space-y-7">
-              {sections.map((section) => (
-                <article
-                  id={section.id}
-                  key={section.id}
-                  className="border-b border-gray-100 pb-6 last:border-b-0 last:pb-0 scroll-mt-24"
-                >
-                  <h2 className="text-xl font-semibold text-gray-900 mb-3">{section.title}</h2>
+                if (block.type === 'hr') {
+                  return <hr key={`block-${index}`} className="border-gray-200" />;
+                }
 
-                  {section.paragraphs.map((paragraph, index) => (
-                    <p key={`${section.id}-p-${index}`} className="text-gray-700 leading-relaxed mb-3 last:mb-0">
-                      {paragraph}
-                    </p>
-                  ))}
-
-                  {section.bullets && (
-                    <ul className="list-disc pl-5 space-y-2 mt-3 text-gray-700 leading-relaxed">
-                      {section.bullets.map((bullet, index) => (
-                        <li key={`${section.id}-b-${index}`}>{bullet}</li>
+                if (block.type === 'ul') {
+                  return (
+                    <ul key={`block-${index}`} className="list-disc pl-5 space-y-2 text-gray-700 leading-relaxed">
+                      {block.items.map((item, itemIndex) => (
+                        <li key={`block-${index}-item-${itemIndex}`}>{renderInline(item)}</li>
                       ))}
                     </ul>
-                  )}
-                </article>
-              ))}
+                  );
+                }
+
+                return (
+                  <p key={`block-${index}`} className="text-gray-700 leading-relaxed">
+                    {renderInline(block.text)}
+                  </p>
+                );
+              })}
             </div>
           </div>
         </section>

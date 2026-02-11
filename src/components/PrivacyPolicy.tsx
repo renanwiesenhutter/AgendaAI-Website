@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 type PrivacySection = {
   id: string;
-  title: string;
+  title?: string;
   paragraphs: string[];
   bulletItems?: string[];
 };
@@ -11,7 +11,7 @@ type PrivacySection = {
 const privacySections: PrivacySection[] = [
   {
     id: 'secao-1',
-    title: 'Ultimas vez atualizado: 11/02/2026',
+    title: '',
     paragraphs: [
       'Esta Política de Privacidade aplica-se ao Agenda AI, um serviço de agendamentos e lembretes operado via WhatsApp. Ela explica como coletamos, usamos, protegemos e compartilhamos suas informações pessoais.',
     ],
@@ -130,6 +130,7 @@ export default function PrivacyPolicy() {
               Documento legal
             </div>
             <h1 className="text-3xl sm:text-4xl font-bold leading-tight">Política de Privacidade do Agenda AI</h1>
+            <p className="mt-4 text-sm text-blue-100">Última atualização: 11 de fevereiro de 2026</p>
           </div>
 
           <div className="px-6 sm:px-10 py-8 sm:py-10">
@@ -140,7 +141,7 @@ export default function PrivacyPolicy() {
                   key={section.id}
                   className="border-b border-gray-100 pb-6 last:border-b-0 last:pb-0 scroll-mt-24"
                 >
-                  <h2 className="text-xl font-semibold text-gray-900 mb-3">{section.title}</h2>
+                  {section.title ? <h2 className="text-xl font-semibold text-gray-900 mb-3">{section.title}</h2> : null}
 
                   {section.paragraphs.map((paragraph, index) => {
                     const isSubheading = /^\d+\.\d+/.test(paragraph.trim());
