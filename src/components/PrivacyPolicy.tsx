@@ -5,172 +5,94 @@ type PrivacySection = {
   id: string;
   title: string;
   paragraphs: string[];
-  bullets?: string[];
+  bulletItems?: string[];
 };
-
-const keyPoints = [
-  'Esta Politica descreve como o Agenda AI coleta, utiliza, compartilha, protege e elimina dados pessoais.',
-  'O tratamento de dados ocorre com base na LGPD e apenas para finalidades legitimas, especificas e informadas.',
-  'Pagamentos e integracoes com terceiros seguem controles contratuais, tecnicos e operacionais adequados.',
-  'Voce pode exercer direitos de titular, incluindo acesso, correcao, portabilidade e eliminacao, nos termos da lei.',
-  'Atualizacoes desta Politica serao publicadas nesta pagina com indicacao da data da versao vigente.',
-];
-
-const summaryItems = [
-  '1. Data de disponibilizacao do texto',
-  '2. Definicoes e conceitos gerais',
-  '3. Escopo de dados pessoais tratados',
-  '4. Formas de coleta de dados',
-  '5. Finalidades e bases legais do tratamento',
-  '6. Compartilhamento de dados com terceiros',
-  '7. Transferencias internacionais de dados',
-  '8. Pagamentos, assinaturas e parceiros financeiros',
-  '9. Cookies e tecnologias semelhantes',
-  '10. Retencao, bloqueio e descarte de dados',
-  '11. Direitos do titular e como exercer',
-  '12. Seguranca da informacao e governanca',
-  '13. Dados de menores de idade',
-  '14. Atualizacoes desta Politica',
-  '15. Contato e solicitacoes de privacidade',
-];
 
 const privacySections: PrivacySection[] = [
   {
     id: 'secao-1',
-    title: '1. Data de disponibilizacao do texto',
-    paragraphs: ['Esta versao da Politica de Privacidade foi disponibilizada em 06/02/2026.'],
+    title: '1. Introdução',
+    paragraphs: [
+      'Esta Política de Privacidade aplica-se ao Agenda AI, um serviço de agendamentos e lembretes operado via WhatsApp. Ela explica como coletamos, usamos, protegemos e compartilhamos suas informações pessoais.',
+    ],
   },
   {
     id: 'secao-2',
-    title: '2. Definicoes e conceitos gerais',
+    title: '2. Coleta de Informações',
     paragraphs: [
-      'Para facilitar a leitura, os termos abaixo sao utilizados com os seguintes significados: Dados Pessoais (informacoes relacionadas a pessoa natural identificada ou identificavel), Titular (pessoa a quem os dados se referem), Tratamento (qualquer operacao realizada com dados), Controlador (quem decide sobre o tratamento) e Operador (quem trata dados em nome do Controlador).',
-      'Quando esta Politica mencionar "Agenda AI", "nos", "nossos" ou termos equivalentes, refere-se ao responsavel pela operacao da plataforma. Quando mencionar "voce" ou "usuario", refere-se ao titular da conta e/ou seu representante legal, conforme o caso.',
+      '2.1 Informações fornecidas pelo usuário:',
+      'Coletamos nome, número de WhatsApp e endereço de e-mail. Essas informações são necessárias para criar sua conta, identificar você no atendimento e fornecer os serviços do Agenda AI.',
+      '2.2 Dados de uso:',
+      'As informações sobre compromissos, eventos e solicitações que você nos envia via WhatsApp (por exemplo: título do evento, data/hora, duração, local, observações e mensagens de ajuste/cancelamento) são utilizadas exclusivamente para viabilizar o serviço do Agenda AI, como:',
+    ],
+    bulletItems: [
+      'Criar, alterar, reagendar e cancelar compromissos;',
+      'Consultar sua agenda;',
+      'Enviar confirmações, lembretes e avisos relacionados aos seus eventos.',
     ],
   },
   {
     id: 'secao-3',
-    title: '3. Escopo de dados pessoais tratados',
+    title: '3. Processamento de Pagamentos',
     paragraphs: [
-      'Podemos tratar dados de cadastro e contato, como nome, e-mail, telefone e informacoes de autenticacao, alem de dados operacionais necessarios para prestacao do servico.',
-      'Tambem podem ser tratados dados relacionados ao uso da plataforma, como preferencias, historico de interacoes, informacoes de agenda, configuracoes e metadados tecnicos (por exemplo, IP, navegador e registro de eventos de seguranca).',
-      'Em determinadas jornadas, podem existir dados enviados por voce em mensagens, textos, audios ou integracoes habilitadas por sua iniciativa. Recomendamos nao inserir dados excessivos ou sensiveis sem necessidade.',
+      '3.1 Pagamentos via plataforma de checkout:',
+      'Quando aplicável, os pagamentos do Agenda AI são processados pela Stripe. O Agenda AI não tem acesso a dados sensíveis de pagamento, como informações completas de cartão de crédito.',
+      'Podemos receber da Stripe apenas informações necessárias para administrar o serviço, como status do pagamento/assinatura (ex.: aprovado, recusado, cancelado, estornado) e identificadores da transação/cliente.',
+      '3.2 Assinaturas via Apple In‑App Purchase:',
+      'Quando você realiza uma assinatura através de um aplicativo iOS, o pagamento é processado inteiramente pela Apple. O Agenda AI não tem acesso a informações de pagamento, como dados de cartão de crédito. As assinaturas podem ser renovadas automaticamente conforme o plano escolhido.',
+      'Você pode gerenciar ou cancelar sua assinatura a qualquer momento em:',
+      'Ajustes > [seu nome] > Assinaturas no seu dispositivo iOS.',
+      'Para mais informações sobre assinaturas e reembolsos via Apple, consulte o suporte oficial da Apple.',
     ],
   },
   {
     id: 'secao-4',
-    title: '4. Formas de coleta de dados',
-    paragraphs: ['A coleta pode ocorrer por diferentes meios, sempre vinculados ao uso legitimo da plataforma e dos canais oficiais.'],
-    bullets: [
-      '4.1. Dados informados diretamente por voce durante cadastro, suporte, contratacao ou uso de funcionalidades.',
-      '4.2. Dados gerados automaticamente durante acesso ao site, aplicacoes, API e integracoes autorizadas.',
-      '4.3. Dados recebidos de parceiros e provedores externos, quando indispensaveis para autenticacao, pagamento, comunicacao e seguranca.',
+    title: '4. Uso e Tratamento dos Dados',
+    paragraphs: [
+      'As informações coletadas são usadas para:',
+    ],
+    bulletItems: [
+      'Operar o Agenda AI e entregar as funcionalidades solicitadas;',
+      'Comunicação relacionada ao serviço (confirmações, lembretes, suporte e avisos);',
+      'Melhorias internas (por exemplo: qualidade do atendimento, correções e análises operacionais).',
     ],
   },
   {
     id: 'secao-5',
-    title: '5. Finalidades e bases legais do tratamento',
+    title: '5. Compartilhamento e Divulgação de Dados',
     paragraphs: [
-      'Tratamos dados pessoais para executar o contrato de uso da plataforma, disponibilizar funcionalidades, enviar lembretes, processar assinaturas, atender chamados e prestar suporte tecnico.',
-      'Tambem tratamos dados para cumprir obrigacoes legais/regulatorias, prevenir fraudes, proteger direitos, garantir seguranca dos ambientes e aprimorar a experiencia do usuario com analises internas de performance e confiabilidade.',
-      'As bases legais incluem, conforme o contexto, execucao de contrato, cumprimento de obrigacao legal, exercicio regular de direitos, legitimo interesse e consentimento, quando exigido pela legislacao aplicavel.',
+      '5.1 Compartilhamento com terceiros',
+      'Não compartilhamos suas informações pessoais com terceiros, exceto quando necessário para operar o serviço (por exemplo: provedores de infraestrutura e pagamento) ou conforme exigido por lei.',
+      '5.2 Exigências legais',
+      'Em casos de solicitação legal ou judicial, podemos ser obrigados a divulgar informações pessoais, dentro dos limites aplicáveis.',
     ],
   },
   {
     id: 'secao-6',
-    title: '6. Compartilhamento de dados com terceiros',
+    title: '6. Segurança e Proteção dos Dados',
     paragraphs: [
-      'O compartilhamento de dados pessoais ocorre apenas no limite necessario para operacao do servico, com parceiros que atuam em nome do Agenda AI ou em funcao de integracoes solicitadas por voce.',
-      'Sempre que possivel, adotamos contratos e requisitos de seguranca para assegurar que terceiros tratem os dados de forma adequada e compativel com esta Politica.',
-    ],
-    bullets: [
-      '6.1. Provedores de infraestrutura, armazenamento, monitoramento e comunicacao.',
-      '6.2. Processadores de pagamento e plataformas de assinatura.',
-      '6.3. Ferramentas de analytics, atendimento e prevencao a fraude.',
-      '6.4. Autoridades publicas, quando houver obrigacao legal, ordem judicial ou requisicao valida.',
+      'Implementamos medidas de segurança para proteger suas informações pessoais contra acesso não autorizado, alteração ou destruição. No entanto, nenhum método de transmissão ou armazenamento eletrônico é completamente seguro.',
     ],
   },
   {
     id: 'secao-7',
-    title: '7. Transferencias internacionais de dados',
+    title: '7. Retenção e Exclusão de Dados',
     paragraphs: [
-      'Alguns provedores utilizados pelo Agenda AI podem armazenar ou processar dados fora do Brasil. Nesses casos, buscamos mecanismos de governanca e seguranca compativeis com a legislacao aplicavel.',
-      'Ao utilizar a plataforma, voce reconhece que determinados fluxos tecnicos podem envolver transferencia internacional, sempre com medidas razoaveis para protecao de dados pessoais.',
+      'Retemos suas informações pessoais pelo tempo necessário para fornecer o serviço e conforme exigido para fins legais ou regulatórios. Quando aplicável e mediante solicitação, poderemos excluir ou anonimizar dados, respeitando obrigações legais.',
     ],
   },
   {
     id: 'secao-8',
-    title: '8. Pagamentos, assinaturas e parceiros financeiros',
+    title: '8. Mudanças na Política de Privacidade',
     paragraphs: [
-      'As cobrancas de assinatura podem ser processadas por parceiros especializados. O Agenda AI nao armazena integralmente dados sensiveis de cartao quando o processamento ocorre por gateway externo.',
-      'Quando a contratacao for realizada por loja de aplicativos, marketplace ou intermediador de pagamento, politicas especificas desse parceiro podem complementar regras de cancelamento, renovacao e estorno.',
-      'Recomendamos a leitura conjunta dos Termos de Uso e das politicas do parceiro de pagamento utilizado no momento da compra.',
+      'Esta Política de Privacidade pode ser atualizada periodicamente. Avisaremos sobre quaisquer mudanças substanciais em como tratamos as informações pessoais.',
     ],
   },
   {
     id: 'secao-9',
-    title: '9. Cookies e tecnologias semelhantes',
+    title: '9. Limitação de Responsabilidade',
     paragraphs: [
-      'Podemos utilizar cookies, SDKs e identificadores similares para autenticacao, seguranca, personalizacao de experiencia, medicao de desempenho e analise de uso da plataforma.',
-      'Voce pode gerenciar parte dessas preferencias em seu navegador, dispositivo ou configuracoes da aplicacao, ciente de que algumas funcionalidades podem ser impactadas.',
-    ],
-    bullets: [
-      '9.1. Cookies essenciais: necessarios para funcionamento e seguranca.',
-      '9.2. Cookies de desempenho: ajudam a medir estabilidade e uso.',
-      '9.3. Cookies funcionais: armazenam preferencias e personalizacao.',
-    ],
-  },
-  {
-    id: 'secao-10',
-    title: '10. Retencao, bloqueio e descarte de dados',
-    paragraphs: [
-      'Os dados pessoais sao mantidos apenas pelo periodo necessario para atender finalidades legitimas desta Politica, execucao contratual, suporte, obrigacoes legais e exercicio regular de direitos.',
-      'Encerrada a necessidade de tratamento, os dados podem ser eliminados, anonimizados ou mantidos bloqueados, conforme requisitos legais, regulatorios e de seguranca.',
-    ],
-  },
-  {
-    id: 'secao-11',
-    title: '11. Direitos do titular e como exercer',
-    paragraphs: [
-      'Nos termos da LGPD, voce pode solicitar confirmacao da existencia de tratamento, acesso, correcao, anonimizacao, bloqueio, eliminacao, portabilidade e informacoes sobre compartilhamento, observadas as hipoteses legais.',
-      'Tambem e possivel requerer revisao de decisoes automatizadas quando aplicavel e revogar consentimento em tratamentos que dependam dessa base legal.',
-    ],
-    bullets: [
-      '11.1. As solicitacoes podem ser feitas pelos canais oficiais de contato do Agenda AI.',
-      '11.2. Poderemos solicitar comprovacao de identidade para protecao do titular e prevencao a fraude.',
-      '11.3. Prazos e limites de atendimento seguem a legislacao vigente e a viabilidade tecnica/juridica do pedido.',
-    ],
-  },
-  {
-    id: 'secao-12',
-    title: '12. Seguranca da informacao e governanca',
-    paragraphs: [
-      'Adotamos medidas tecnicas e administrativas razoaveis para proteger dados pessoais contra acessos nao autorizados, perda, alteracao, divulgacao ou destruicao indevida.',
-      'Nenhum sistema e totalmente imune a incidentes. Ainda assim, mantemos processos de monitoramento, controle de acesso e melhoria continua para reduzir riscos operacionais.',
-    ],
-  },
-  {
-    id: 'secao-13',
-    title: '13. Dados de menores de idade',
-    paragraphs: [
-      'A plataforma nao e direcionada intencionalmente a menores sem representacao legal. Caso seja identificado tratamento inadequado, poderemos adotar medidas para restringir conta e remover dados, conforme permitido por lei.',
-      'Responsaveis legais que identificarem uso indevido por menor podem entrar em contato para analise e providencias cabiveis.',
-    ],
-  },
-  {
-    id: 'secao-14',
-    title: '14. Atualizacoes desta Politica',
-    paragraphs: [
-      'Podemos atualizar esta Politica para refletir mudancas legais, regulatorias, tecnicas ou de produto. A versao vigente sera sempre publicada nesta pagina com a respectiva data de atualizacao.',
-      'Em alteracoes relevantes, poderemos adotar mecanismos adicionais de comunicacao pelos canais disponiveis.',
-    ],
-  },
-  {
-    id: 'secao-15',
-    title: '15. Contato e solicitacoes de privacidade',
-    paragraphs: [
-      'Para duvidas, requisicoes relacionadas a dados pessoais ou exercicio de direitos de titular, utilize os canais oficiais informados no site do Agenda AI.',
-      'As demandas serao analisadas conforme a legislacao aplicavel e os procedimentos internos de seguranca e governanca de dados.',
+      'Enquanto nos esforçamos para proteger suas informações pessoais, não podemos garantir sua segurança absoluta. Não somos responsáveis por acessos não autorizados ou outras violações de segurança que escapem ao nosso controle razoável.',
     ],
   },
 ];
@@ -204,34 +126,10 @@ export default function PrivacyPolicy() {
               <ShieldCheck className="w-4 h-4" />
               Documento legal
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold leading-tight">Política de Privacidade</h1>
-            <p className="mt-3 text-blue-100 text-base sm:text-lg">
-              Leia com atencao como o Agenda AI trata dados pessoais em todas as etapas da prestacao do servico.
-            </p>
-            <p className="mt-4 text-sm text-blue-100">Última atualização: 06 de fevereiro de 2026</p>
+            <h1 className="text-3xl sm:text-4xl font-bold leading-tight">Política de Privacidade do Agenda AI</h1>
           </div>
 
           <div className="px-6 sm:px-10 py-8 sm:py-10">
-            <article className="bg-blue-50 border border-blue-100 rounded-2xl p-5 sm:p-6">
-              <h2 className="text-lg sm:text-xl font-semibold text-blue-900 mb-3">Compromissos de privacidade</h2>
-              <ul className="list-disc pl-5 space-y-2 text-blue-900/90">
-                {keyPoints.map((point, index) => (
-                  <li key={`point-${index}`} className="leading-relaxed">
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            </article>
-
-            <article className="mt-8 sm:mt-10 mb-24 sm:mb-28 bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 mb-8">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3">Conteudo desta Politica</h2>
-              <ul className="list-disc pl-5 space-y-2 text-gray-700 leading-relaxed">
-                {summaryItems.map((item, index) => (
-                  <li key={`summary-${index}`}>{item}</li>
-                ))}
-              </ul>
-            </article>
-
             <div className="space-y-7">
               {privacySections.map((section) => (
                 <article
@@ -241,16 +139,23 @@ export default function PrivacyPolicy() {
                 >
                   <h2 className="text-xl font-semibold text-gray-900 mb-3">{section.title}</h2>
 
-                  {section.paragraphs.map((paragraph, index) => (
-                    <p key={`${section.id}-p-${index}`} className="text-gray-700 leading-relaxed mb-3 last:mb-0">
-                      {paragraph}
-                    </p>
-                  ))}
+                  {section.paragraphs.map((paragraph, index) => {
+                    const isSubheading = /^\d+\.\d+/.test(paragraph.trim());
+                    const isLastParagraph = index === section.paragraphs.length - 1;
+                    const hasBulletItems = Boolean(section.bulletItems?.length);
+                    const spacingClass = isLastParagraph && !hasBulletItems ? 'mb-0' : isSubheading ? 'mb-1' : 'mb-3';
 
-                  {section.bullets && (
-                    <ul className="list-disc pl-5 space-y-2 mt-3 text-gray-700 leading-relaxed">
-                      {section.bullets.map((bullet, index) => (
-                        <li key={`${section.id}-b-${index}`}>{bullet}</li>
+                    return (
+                      <p key={`${section.id}-p-${index}`} className={`text-gray-700 leading-relaxed ${spacingClass}`}>
+                        {paragraph}
+                      </p>
+                    );
+                  })}
+
+                  {section.bulletItems && section.bulletItems.length > 0 && (
+                    <ul className="list-disc pl-6 text-gray-700 leading-relaxed space-y-2">
+                      {section.bulletItems.map((item, index) => (
+                        <li key={`${section.id}-li-${index}`}>{item}</li>
                       ))}
                     </ul>
                   )}
