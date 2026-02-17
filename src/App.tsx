@@ -4,6 +4,7 @@ import Home from './components/Home';
 import Checkout from './components/Checkout';
 import TermsOfUse from './components/TermsOfUse';
 import PrivacyPolicy from './components/PrivacyPolicy';
+import GoogleConnected from './components/GoogleConnected';
 
 export default function App() {
   const { pathname } = useLocation();
@@ -25,6 +26,7 @@ export default function App() {
       <Route path="/checkout" element={<Checkout />} />
       <Route path="/termos-de-uso" element={<TermsOfUse />} />
       <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+      <Route path="/google/conectado" element={<GoogleConnected />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
