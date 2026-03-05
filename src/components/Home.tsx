@@ -719,15 +719,15 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
     answer: "Sim! Com o Agenda AI você pode configurar lembretes recorrentes de forma simples e rápida. Basta enviar uma mensagem no WhatsApp dizendo, por exemplo: \"Me lembre de tomar meu remédio todos os dias às 20h\" ou \"Agende minha aula de inglês toda segunda às 19h\".\n\nA inteligência artificial entende a recorrência e cria os eventos automaticamente no seu calendário, enviando notificações no WhatsApp sempre no horário definido."
     },
     {
-      question: "Como faço para integrar com o Google Calendar?",
-      answer: "É bem simples! Assim que a sua conta for ativada após a compra, você receberá no WhatsApp uma mensagem com um link para conectar ao Google Calendar.\n\nBasta abrir o link, entrar na sua conta Google e clicar em adicionar agenda. Depois disso, seus compromissos passam a ser sincronizados automaticamente.\n\nE se no futuro você precisar reconectar, é só enviar o comando /Agenda no WhatsApp que o link será enviado novamente."
+      question: "Como faço para integrar o Agenda AI com o Google Calendar?",
+      answer: "É bem simples! Assim que a sua conta for ativada após a compra, você receberá no WhatsApp uma mensagem com um link para conectar ao Google Calendar.\n\nBasta abrir o link, entrar na sua conta Google e clicar em continuar. Depois disso, seus compromissos passam a ser sincronizados automaticamente."
     },
     {
     question: "Como funciona o cancelamento?",
     answer: "É bem simples! Basta acessar o site, clicar em Login e entrar com o mesmo e-mail usado na sua assinatura. Lá você terá acesso ao painel da sua conta e poderá gerenciar tudo, inclusive o cancelamento.\n\nO processo é rápido e você pode cancelar quando quiser, sem burocracia. E se mudar de ideia, basta assinar novamente: sua conta será reativada e todos os seus compromissos estarão lá, sem perder nada."
     },
     {
-    question: "Tem algum plano para testar como funciona?",
+    question: "Tem algum plano para testar como funciona antes de assinar?",
     answer: "Sim! No plano anual você tem 7 dias gratuitos para experimentar o Agenda AI sem nenhum compromisso. Durante esse período pode usar todos os recursos normalmente, como registrar compromissos por texto, áudio ou imagem, receber lembretes no WhatsApp e integrar com o Google Calendar.\n\nSe não gostar ou achar que não é para você, basta cancelar dentro do período de teste e nada será cobrado."
     }
   ];
