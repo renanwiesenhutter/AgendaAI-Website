@@ -3,15 +3,32 @@ import { SiYoutube, SiWhatsapp, SiInstagram } from "react-icons/si";
 import { Calendar, MessageCircle, CheckCircle, Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, ChevronLeft, ChevronRight, ChevronDown, X, Menu } from 'lucide-react';
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+const HEADER_SECTIONS = [
+  { id: 'top', label: 'Início', width: 44 },
+  { id: 'como-funciona', label: 'Como Usar', width: 102 },
+  { id: 'depoimentos', label: 'Avaliações', width: 70 },
+  { id: 'precos', label: 'Preços', width: 48 },
+] as const;
+
 function Home() {
   const [fullscreenMedia, setFullscreenMedia] = useState<{ type: 'image' | 'video', src: string } | null>(null);
   const [imgLoading, setImgLoading] = useState(false);
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentSectionLabel, setCurrentSectionLabel] = useState('Início');
+  const [sectionLabelWidth, setSectionLabelWidth] = useState<number>(HEADER_SECTIONS[0].width);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scrollLockY = useRef(0);
+  const headerRef = useRef<HTMLElement>(null);
   const headerBarRef = useRef<HTMLDivElement>(null);
+  const loginPillRef = useRef<HTMLAnchorElement>(null);
+  const loginSheenRef = useRef<HTMLSpanElement>(null);
+  const loginBlobLeftRef = useRef<HTMLSpanElement>(null);
+  const loginBlobRightRef = useRef<HTMLSpanElement>(null);
+  const loginInnerBorderRef = useRef<HTMLSpanElement>(null);
   const scrollAnimationRef = useRef<number | null>(null);
+  const sectionIndexRef = useRef(0);
+  const sectionInitRef = useRef(false);
   const groupPlaying: Record<string, string | null> = {};
   const IS_IOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
@@ -274,9 +291,13 @@ function AutoPlayVideo({
   preload?: "none" | "metadata" | "auto";
 }) {
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const posterRef = React.useRef<HTMLImageElement>(null);
+  const loaderRef = React.useRef<HTMLDivElement>(null);
+  const revealedRef = React.useRef(false);
+  const posterFadeTimerRef = React.useRef<number | null>(null);
 
   const [userPaused, setUserPaused] = React.useState(false);
-  const [showOverlayIcon, setShowOverlayIcon] = React.useState(true);
+  const [showOverlayIcon, setShowOverlayIcon] = React.useState(false);
   const [isReady, setIsReady] = React.useState(false);
 
   const claimingRef = React.useRef(false);
@@ -315,6 +336,10 @@ function AutoPlayVideo({
 
     return () => {
       destroyedRef.current = true;
+      if (posterFadeTimerRef.current) {
+        window.clearTimeout(posterFadeTimerRef.current);
+        posterFadeTimerRef.current = null;
+      }
       el.removeEventListener("loadedmetadata", onMeta);
       el.removeEventListener("loadeddata", onMeta);
       el.removeEventListener("canplay", onMeta);
@@ -329,7 +354,7 @@ function AutoPlayVideo({
         const el = videoRef.current;
         if (!el) return;
         el.pause();
-        setShowOverlayIcon(true);
+        setShowOverlayIcon(false);
       }
     };
     window.addEventListener("autoplay-group-play", onOtherPlay as any);
@@ -374,6 +399,20 @@ function AutoPlayVideo({
     claimingRef.current = false;
   };
 
+  const revealVideo = React.useCallback(() => {
+    if (revealedRef.current) return;
+    revealedRef.current = true;
+    const v = videoRef.current;
+    if (v) v.style.opacity = "1";
+    if (posterRef.current) {
+      posterRef.current.style.opacity = "0";
+      posterFadeTimerRef.current = window.setTimeout(() => {
+        if (posterRef.current) posterRef.current.style.display = "none";
+      }, 220);
+    }
+    if (loaderRef.current) loaderRef.current.classList.add("hidden");
+  }, []);
+
   // Autoplay com IntersectionObserver
   React.useEffect(() => {
     const el = videoRef.current;
@@ -385,6 +424,7 @@ function AutoPlayVideo({
 
         if (enough && !userPaused) {
           if (!isReady) return;
+          if (!destroyedRef.current) setShowOverlayIcon(false);
           // @ts-ignore
           if (groupPlaying[group] !== id) {
             await claimAndPlayFromStart();
@@ -394,7 +434,7 @@ function AutoPlayVideo({
           }
         } else {
           el.pause();
-          if (!destroyedRef.current) setShowOverlayIcon(true);
+          if (!destroyedRef.current && userPaused) setShowOverlayIcon(true);
           // @ts-ignore
           if (groupPlaying[group] === id) groupPlaying[group] = null;
         }
@@ -430,16 +470,18 @@ function AutoPlayVideo({
       {/* Poster fixo até carregar */}
       {poster && (
         <img
+          ref={posterRef}
           id={`poster-${id}`}
           src={poster}
           alt="Poster do vídeo"
-          className="absolute inset-0 w-full h-full object-cover rounded-2xl z-10 select-none pointer-events-none"
+          className="absolute inset-0 w-full h-full object-cover rounded-2xl z-10 select-none pointer-events-none transition-opacity duration-200"
           draggable={false}
         />
       )}
 
       {/* Loader */}
       <div
+        ref={loaderRef}
         id={`loader-${id}`}
         className="absolute inset-0 flex items-center justify-center z-20 bg-black/40"
       >
@@ -449,7 +491,7 @@ function AutoPlayVideo({
       {/* Video */}
       <video
         ref={videoRef}
-        className="w-full h-full object-cover bg-black rounded-2xl opacity-0 transition-opacity duration-150"
+        className="w-full h-full object-cover rounded-2xl"
         muted
         loop
         playsInline
@@ -457,16 +499,21 @@ function AutoPlayVideo({
         poster={poster}
         onLoadedData={() => {
           setIsReady(true);
-          const v = videoRef.current;
-          if (v) v.style.opacity = "1";
-          document.getElementById(`poster-${id}`)?.classList.add("hidden");
-          document.getElementById(`loader-${id}`)?.classList.add("hidden");
+          if (loaderRef.current) loaderRef.current.classList.add("hidden");
         }}
         onError={() => {
           setIsReady(true);
-          document.getElementById(`loader-${id}`)?.classList.add("hidden");
+          if (loaderRef.current) loaderRef.current.classList.add("hidden");
         }}
-        onPause={() => setShowOverlayIcon(true)}
+        onPlaying={revealVideo}
+        onTimeUpdate={() => {
+          const v = videoRef.current;
+          if (!v || revealedRef.current) return;
+          if (v.currentTime > 0.03) revealVideo();
+        }}
+        onPause={() => {
+          if (userPaused) setShowOverlayIcon(true);
+        }}
         onPlay={() => setShowOverlayIcon(false)}
       >
         <source src={src} type="video/mp4" />
@@ -732,113 +779,191 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
     }
   ];
 
-  // Mobile menu toggle
   const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
+    setMobileMenuOpen((prev) => !prev);
   };
 
-  // Close mobile menu when clicking on a link
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
   };
 
+  useEffect(() => {
+    let ticking = false;
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+    const updateHeaderState = () => {
+      const blend = mobileMenuOpen ? 1 : Math.min(window.scrollY / 320, 1);
+      if (headerRef.current) {
+        headerRef.current.style.backgroundColor = `rgba(255, 255, 255, ${blend})`;
+        headerRef.current.style.borderBottomColor = `rgba(229, 231, 235, ${blend})`;
+      }
+
+      const isHeaderSolid = blend >= 0.995;
+      if (loginPillRef.current) {
+        if (isHeaderSolid) {
+          loginPillRef.current.style.background = 'transparent';
+          loginPillRef.current.style.borderColor = 'transparent';
+          loginPillRef.current.style.boxShadow = 'none';
+          loginPillRef.current.style.backdropFilter = 'blur(0px)';
+        } else {
+          loginPillRef.current.style.background = 'linear-gradient(180deg, rgba(255, 255, 255, 0.56) 0%, rgba(255, 255, 255, 0.18) 100%)';
+          loginPillRef.current.style.borderColor = 'rgba(255, 255, 255, 0.85)';
+          loginPillRef.current.style.boxShadow = 'inset 0 1px 0 rgba(255, 255, 255, 0.98), inset 0 -1px 0 rgba(255, 255, 255, 0.45), 0 8px 18px -12px rgba(15, 23, 42, 0.42)';
+          loginPillRef.current.style.backdropFilter = 'blur(24px)';
+        }
+      }
+
+      const glassOpacity = isHeaderSolid ? '0' : '1';
+      if (loginSheenRef.current) loginSheenRef.current.style.opacity = glassOpacity;
+      if (loginBlobLeftRef.current) loginBlobLeftRef.current.style.opacity = glassOpacity;
+      if (loginBlobRightRef.current) loginBlobRightRef.current.style.opacity = glassOpacity;
+      if (loginInnerBorderRef.current) loginInnerBorderRef.current.style.opacity = glassOpacity;
+
+      if (prefersReducedMotion) {
+        if (loginSheenRef.current) loginSheenRef.current.style.transform = 'none';
+        if (loginBlobLeftRef.current) loginBlobLeftRef.current.style.transform = 'translateY(-50%)';
+        if (loginBlobRightRef.current) loginBlobRightRef.current.style.transform = 'none';
+      } else {
+        const y = window.scrollY;
+        const sheenX = Math.sin(y / 170) * 4;
+        const sheenY = Math.cos(y / 230) * 1.8;
+        const blobLeftX = Math.cos(y / 150) * 2.2;
+        const blobLeftY = Math.sin(y / 210) * 1.4;
+        const blobRightX = Math.sin(y / 190) * 2;
+        const blobRightY = Math.cos(y / 250) * 1.2;
+
+        if (loginSheenRef.current) {
+          loginSheenRef.current.style.transform = `translate3d(${sheenX.toFixed(2)}px, ${sheenY.toFixed(2)}px, 0)`;
+        }
+        if (loginBlobLeftRef.current) {
+          loginBlobLeftRef.current.style.transform = `translate3d(${blobLeftX.toFixed(2)}px, calc(-50% + ${blobLeftY.toFixed(2)}px), 0)`;
+        }
+        if (loginBlobRightRef.current) {
+          loginBlobRightRef.current.style.transform = `translate3d(${blobRightX.toFixed(2)}px, ${blobRightY.toFixed(2)}px, 0)`;
+        }
+      }
+
+      const activeProbeY = window.scrollY + 130;
+      const sectionTops = HEADER_SECTIONS.map((section) => {
+        const sectionEl = document.getElementById(section.id);
+        return sectionEl ? sectionEl.offsetTop : 0;
+      });
+
+      let nextSectionIndex = 0;
+      for (let i = HEADER_SECTIONS.length - 1; i >= 0; i -= 1) {
+        if (activeProbeY >= sectionTops[i]) {
+          nextSectionIndex = i;
+          break;
+        }
+      }
+
+      if (sectionInitRef.current) {
+        const currentIndex = sectionIndexRef.current;
+        if (nextSectionIndex > currentIndex) {
+          if (activeProbeY < sectionTops[nextSectionIndex] + 30) nextSectionIndex = currentIndex;
+        } else if (nextSectionIndex < currentIndex) {
+          if (activeProbeY > sectionTops[currentIndex] - 30) nextSectionIndex = currentIndex;
+        }
+      }
+
+      if (!sectionInitRef.current) {
+        sectionInitRef.current = true;
+        sectionIndexRef.current = nextSectionIndex;
+        setCurrentSectionLabel(HEADER_SECTIONS[nextSectionIndex].label);
+        setSectionLabelWidth(HEADER_SECTIONS[nextSectionIndex].width);
+      } else if (nextSectionIndex !== sectionIndexRef.current) {
+        sectionIndexRef.current = nextSectionIndex;
+        setCurrentSectionLabel(HEADER_SECTIONS[nextSectionIndex].label);
+        setSectionLabelWidth(HEADER_SECTIONS[nextSectionIndex].width);
+      }
+
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(updateHeaderState);
+    };
+
+    updateHeaderState();
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, [mobileMenuOpen]);
+
   return (
-    <div className="min-h-screen bg-white" onClick={handleAnchorClick}>
+    <div className="min-h-screen bg-[#f7fbff]" onClick={handleAnchorClick}>
       <div id="top" />
       {/* Header - Fixed */}
-      <header className="bg-white shadow-[0_4px_20px_-2px_rgba(0,0,0,0.1)] border-b border-gray-100 fixed top-0 left-0 right-0 z-50">
+      <header
+        ref={headerRef}
+        className="fixed top-0 left-0 right-0 z-50 border-b transition-colors duration-200"
+        style={{ backgroundColor: 'rgba(255, 255, 255, 0)', borderBottomColor: 'rgba(229, 231, 235, 0)' }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-2" ref={headerBarRef}>
-            <a href="#top" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-600 rounded-lg flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-2xl font-bold text-gray-900">Agenda AI</span>
+          <div className="relative flex items-center justify-between h-10" ref={headerBarRef}>
+            <button
+              type="button"
+              onClick={toggleMobileMenu}
+              className="inline-flex h-full items-center gap-[1px] text-gray-800 hover:opacity-80 transition-opacity"
+              aria-expanded={mobileMenuOpen}
+              aria-controls="home-sections-menu"
+            >
+              {mobileMenuOpen ? (
+                <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+              ) : (
+                <Menu className="w-3.5 h-3.5 shrink-0" />
+              )}
+              <span
+                className="relative ml-0 inline-block h-4 overflow-hidden whitespace-nowrap text-left text-[14px] font-medium leading-4"
+                style={{ width: `${sectionLabelWidth}px`, transition: 'width 500ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}
+              >
+                <span className="block">{currentSectionLabel}</span>
+              </span>
+            </button>
+
+            <a href="#top" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 inline-flex items-center space-x-1 hover:opacity-80 transition-opacity">
+              <img src="/images/LogoIcon.png" alt="Logo" className="w-[16px] h-[16px] object-cover rounded-sm" />
+              <span className="text-[16px] font-bold text-gray-900 leading-none" style={{ fontFamily: '"#Lexend", "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>Agenda AI</span>
             </a>
 
-            
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-6">
-              <nav className="flex space-x-6">
-                <a href="#como-funciona" className="text-gray-600 hover:text-blue-600 transition-colors">Como Funciona</a>
-                <a href="#depoimentos" className="text-gray-600 hover:text-blue-600 transition-colors">Avaliações</a>
-                <a href="#precos" className="text-gray-600 hover:text-blue-600 transition-colors">Planos</a>
-              </nav>
-              <a
-                href="https://billing.stripe.com/p/login/dRm4gy9hC2DGd8cgVA5ZC00"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                Minha Conta
-              </a>
-            </div>
-
-            {/* Mobile Navigation */}
-            <div className="md:hidden flex items-center space-x-1">
-              <a 
+            <a
+              ref={loginPillRef}
               href="https://billing.stripe.com/p/login/dRm4gy9hC2DGd8cgVA5ZC00"
-              className="bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
-              >
-                Login
-              </a>
-              <button
-                onClick={toggleMobileMenu}
-                className="text-gray-600 hover:text-gray-900 transition-colors p-2"
-              >
-                <Menu className="w-8 h-8" />
-              </button>
-            </div>
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative isolate inline-flex h-8 items-center justify-center overflow-hidden rounded-full px-4 text-sm font-medium text-slate-800 border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.56)_0%,rgba(255,255,255,0.18)_100%)] backdrop-blur-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.98),inset_0_-1px_0_rgba(255,255,255,0.45),0_8px_18px_-12px_rgba(15,23,42,0.42)] ring-1 ring-white/55 transition-[background-color,color,box-shadow] duration-300"
+            >
+              <span ref={loginSheenRef} className="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(100%_70%_at_15%_0%,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0)_72%)] transition-[transform,opacity] duration-500 ease-out" />
+              <span ref={loginBlobLeftRef} className="pointer-events-none absolute -left-4 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full bg-cyan-300/45 blur-md transition-[transform,opacity] duration-500 ease-out" />
+              <span ref={loginBlobRightRef} className="pointer-events-none absolute -right-3 top-1 h-6 w-6 rounded-full bg-fuchsia-300/35 blur-md transition-[transform,opacity] duration-500 ease-out" />
+              <span ref={loginInnerBorderRef} className="pointer-events-none absolute inset-[1px] rounded-full border border-white/35 transition-opacity duration-300" />
+              <span className="relative z-10">Login</span>
+            </a>
           </div>
         </div>
 
-        {/* Mobile Menu Dropdown */}
         <div
-          className={`md:hidden bg-white border-t transition-[max-height,opacity,transform] duration-700 ease-in-out overflow-hidden ${
-            mobileMenuOpen
-              ? "max-h-64 opacity-100 translate-y-0 border-gray-100 shadow-lg"
-              : "max-h-0 opacity-0 -translate-y-2 border-transparent shadow-none pointer-events-none"
-          }`}
+          id="home-sections-menu"
+          className={`absolute top-full left-0 right-0 grid overflow-hidden bg-[#f3f3f4] will-change-[grid-template-rows,opacity] transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${mobileMenuOpen ? "grid-rows-[1fr] opacity-100 border-t border-gray-200 pointer-events-auto" : "grid-rows-[0fr] opacity-0 border-t-0 pointer-events-none"}`}
           aria-hidden={!mobileMenuOpen}
         >
-          <div className={`px-4 py-2 space-y-1 transition-opacity duration-300 ease-in-out ${mobileMenuOpen ? "opacity-100" : "opacity-0"}`}>
-            <a 
-              href="#como-funciona" 
-              className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
-              onClick={closeMobileMenu}
-            >
-              Como Funciona
-            </a>
-            <a 
-              href="#depoimentos" 
-              className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
-              onClick={closeMobileMenu}
-            >
-              Avaliações
-            </a>
-            <a 
-              href="#precos" 
-              className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
-              onClick={closeMobileMenu}
-            >
-              Planos
-            </a>
-          </div>
+          <nav className={`max-w-7xl mx-auto min-h-0 w-full overflow-hidden px-4 sm:px-6 lg:px-8 py-2 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${mobileMenuOpen ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}>
+            <a href="#top" onClick={closeMobileMenu} className="block py-3 text-xl font-semibold text-gray-900">Início</a>
+            <a href="#como-funciona" onClick={closeMobileMenu} className="block py-3 text-xl font-semibold text-gray-900">Como funciona</a>
+            <a href="#depoimentos" onClick={closeMobileMenu} className="block py-3 text-xl font-semibold text-gray-900">Avaliações</a>
+            <a href="#precos" onClick={closeMobileMenu} className="block py-3 text-xl font-semibold text-gray-900">Preços</a>
+          </nav>
         </div>
       </header>
 
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-40 md:hidden"
-          onClick={closeMobileMenu}
-          aria-hidden="true"
-        />
-      )}
-
       {/* Add padding to account for fixed header */}
-      <div className="pt-5">
+      <div className="pt-10">
         {/* Hero Section */}
-        <section className="bg-white py-20">
+        <section className="bg-transparent pt-6 pb-20 md:pt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-12 items-center text-center lg:text-left">
               {/* Left Content */}
@@ -981,187 +1106,103 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
         </section>
 
         {/* Como Funciona */}
-        <section id="como-funciona" className="py-20 bg-white">
+        <section id="como-funciona" className="py-20 bg-transparent">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Steps - Alternating Layout */}
-            <div className="space-y-20 md:space-y-20 lg:space-y-20">
-              {/* Step 1 - Left Content, Right Video */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center">
-                <div className="order-1">
-                  <div className="flex items-center mb-6">
-                    <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl mr-6">
-                      01
-                    </div>
+            <div className="space-y-20">
+              <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-14 lg:items-center">
+                <div className="order-1 max-w-2xl mx-auto text-center lg:text-left lg:mx-0 mb-8 lg:mb-0">
+                  <div className="mb-5 flex justify-center">
+                    <img src="/images/ConversationIcon.png" alt="Audio" className="w-16 h-16 object-contain drop-shadow-[0_2px_6px_rgba(15,23,42,0.14)]" />
                   </div>
-                  <h3 className="text-3xl font-bold text-gray-900 mb-6">Agende tudo pelo WhatsApp</h3>
-                  <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                    Agende compromissos e receba lembretes diretamente pelo WhatsApp. 
-                    Basta enviar uma mensagem e o nosso assistente virtual registra automaticamente tudo no seu calendário.
+                  <h3 className="text-2xl md:text-4xl font-bold text-gray-900 mb-5 text-center">Agende tudo direto no WhatsApp</h3>
+                  <p className="text-base md:text-lg text-gray-600 leading-relaxed text-center">
+                    Agende compromissos e receba lembretes diretamente pelo WhatsApp. Basta enviar uma mensagem e o nosso assistente registra automaticamente tudo no seu calendário.
                   </p>
-                  <ul className="space-y-3">
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Agendamento rápido por mensagem de texto ou áudio</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Interpretação automática de datas e horários</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Praticidade e comodidade</span>
-                    </li>
-                  </ul>
                 </div>
                 <div className="order-2">
-                  <div className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px]
-                                  aspect-square bg-transparent rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center">
                 <AutoPlayVideo
-                id="v1"
-                group="steps"
-                src="/videos/Video1.mp4"
-                playThreshold={0.4}
-                margin="-30% 0px -30% 0px"
-                preload="metadata"
-                poster="/images/VideoCover1.webp"
-                className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"/>
-                  </div>
+                  id="v1"
+                  group="steps"
+                  src="/videos/Video1.mp4"
+                  playThreshold={0.4}
+                  margin="-30% 0px -30% 0px"
+                  preload="metadata"
+                  poster="/images/VideoCover1.webp"
+                  className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"
+                />
                 </div>
               </div>
 
-              {/* Step 2 - Right Content, Left Video */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center">
+              <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-14 lg:items-center">
+                <div className="order-1 lg:order-2 max-w-2xl mx-auto text-center lg:text-left lg:mx-0 mb-8 lg:mb-0">
+                  <div className="mb-5 flex justify-center">
+                    <img src="/images/CalendarIcon.png" alt="Calendar" className="w-16 h-16 object-contain drop-shadow-[0_2px_6px_rgba(15,23,42,0.14)]" />
+                  </div>
+                  <h3 className="text-2xl md:text-4xl font-bold text-gray-900 mb-5 text-center">Sincronização com o Calendário</h3>
+                  <p className="text-base md:text-lg text-gray-600 leading-relaxed text-center">
+                    Todos os seus compromissos são automaticamente sincronizados com o seu calendário Google ou Apple. Tenha acesso fácil e imediato aos seus eventos em qualquer dispositivo, em tempo real.
+                  </p>
+                </div>
                 <div className="order-2 lg:order-1">
-                  <div className="mx-auto w-full
-                                  max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px]
-                                  aspect-square bg-transparent rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center">
                 <AutoPlayVideo
-                id="v2"
-                group="steps"
-                src="/videos/Video2.mp4"
-                playThreshold={0.4}
-                margin="-30% 0px -30% 0px"
-                preload="metadata"
-                poster="/images/VideoCover2.webp"
-                className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"/>
-                  </div>
-                </div>
-                <div className="order-1 lg:order-2">
-                  <div className="flex items-center mb-6">
-                    <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl mr-6">
-                      02
-                    </div>
-                  </div>
-                  <h3 className="text-3xl font-bold text-gray-900 mb-6">Sincronização direta com o Calendário</h3>
-                  <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                    Todos os seus compromissos são automaticamente sincronizados com seu Google Calendar. 
-                    Tenha acesso fácil e imediato aos seus eventos em qualquer dispositivo, em tempo real.
-                  </p>
-                  <ul className="space-y-3">
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Sincronização automática com Google Calendar</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Acesso em todos os dispositivos</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Experiência prática e acessível</span>
-                    </li>
-                  </ul>
+                  id="v2"
+                  group="steps"
+                  src="/videos/Video2.mp4"
+                  playThreshold={0.4}
+                  margin="-30% 0px -30% 0px"
+                  preload="metadata"
+                  poster="/images/VideoCover2.webp"
+                  className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"
+                />
                 </div>
               </div>
 
-              {/* Step 3 - Left Content, Right Video */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center">
-                <div className="order-1">
-                  <div className="flex items-center mb-6">
-                    <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl mr-6">
-                      03
-                    </div>
+              <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-14 lg:items-center">
+                <div className="order-1 max-w-2xl mx-auto text-center lg:text-left lg:mx-0 mb-8 lg:mb-0">
+                  <div className="mb-5 flex justify-center">
+                    <img src="/images/ClockIcon.png" alt="Clock" className="w-16 h-16 object-contain drop-shadow-[0_2px_6px_rgba(15,23,42,0.14)]" />
                   </div>
-                  <h3 className="text-3xl font-bold text-gray-900 mb-6">Personalize seus lembretes</h3>
-                  <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                    Você escolhe como e quando quer ser lembrado. 
-                    Defina facilmente o tempo de antecedência dos lembretes e receba avisos personalizados diretamente no WhatsApp, 
-                    do jeito que você preferir.
+                  <h3 className="text-2xl md:text-4xl font-bold text-gray-900 mb-5 text-center">Lembretes Inteligentes</h3>
+                  <p className="text-base md:text-lg text-gray-600 leading-relaxed text-center">
+                    Você escolhe como e quando quer ser lembrado. Defina facilmente o tempo de antecedência dos lembretes e receba avisos personalizados diretamente no WhatsApp, do jeito que você preferir.
                   </p>
-                  <ul className="space-y-3">
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Lembretes adaptados à sua rotina</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Escolha quando deseja ser avisado</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Controle total sobre suas notificações</span>
-                    </li>
-                  </ul>
                 </div>
                 <div className="order-2">
-                  <div className="mx-auto w-full
-                                  max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px]
-                                  aspect-square bg-transparent rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center">
                 <AutoPlayVideo
-                id="v3"
-                group="steps"
-                src="/videos/Video3.mp4"
-                playThreshold={0.4}
-                margin="-30% 0px -30% 0px"
-                preload="metadata"
-                poster="/images/VideoCover3.webp"
-                className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"/>
-                  </div>
+                  id="v3"
+                  group="steps"
+                  src="/videos/Video3.mp4"
+                  playThreshold={0.4}
+                  margin="-30% 0px -30% 0px"
+                  preload="metadata"
+                  poster="/images/VideoCover3.webp"
+                  className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"
+                />
                 </div>
               </div>
 
-              {/* Step 4 - Right Content, Left Video */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center">
-                <div className="order-2 lg:order-1">
-                  <div className="mx-auto w-full
-                                  max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px]
-                                  aspect-square bg-transparent rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center">
-                <AutoPlayVideo
-                id="v4"
-                group="steps"
-                src="/videos/Video4.mp4"
-                playThreshold={0.4}
-                margin="-30% 0px -30% 0px"
-                preload="metadata"
-                poster="/images/VideoCover4.webp"
-                className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"/>
+              <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-14 lg:items-center">
+                <div className="order-1 lg:order-2 max-w-2xl mx-auto text-center lg:text-left lg:mx-0 mb-8 lg:mb-0">
+                  <div className="mb-5 flex justify-center">
+                    <img src="/images/ChecklistIcon.png" alt="Checklist" className="w-16 h-16 object-contain drop-shadow-[0_2px_6px_rgba(15,23,42,0.14)]" />
                   </div>
-                </div>
-                <div className="order-1 lg:order-2">
-                  <div className="flex items-center mb-6">
-                    <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl mr-6">
-                      04
-                    </div>
-                  </div>
-                  <h3 className="text-3xl font-bold text-gray-900 mb-6">Resumo diário </h3>
-                  <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                    Receba toda manhã um resumo completo dos seus compromissos e afazeres do dia, 
-                    diretamente no WhatsApp. Comece o dia sabendo exatamente o que precisa ser feito.
+                  <h3 className="text-2xl md:text-4xl font-bold text-gray-900 mb-5 text-center">Resumo Diário</h3>
+                  <p className="text-base md:text-lg text-gray-600 leading-relaxed text-center">
+                    Receba toda manhã um resumo completo dos seus compromissos e afazeres do dia, diretamente no WhatsApp. Comece o dia sabendo exatamente o que precisa ser feito.
                   </p>
-                  <ul className="space-y-3">
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Resumo diário automático</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Sem surpresas durante o dia</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 md:w-5 md:h-5 text-green-500 flex-shrink-0 mt-1" />
-                      <span className="text-gray-700">Mais controle e produtividade na sua rotina</span>
-                    </li>
-                  </ul>
+                </div>
+                <div className="order-2 lg:order-1">
+                <AutoPlayVideo
+                  id="v4"
+                  group="steps"
+                  src="/videos/Video4.mp4"
+                  playThreshold={0.4}
+                  margin="-30% 0px -30% 0px"
+                  preload="metadata"
+                  poster="/images/VideoCover4.webp"
+                  className="mx-auto w-full max-w-[360px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl"
+                />
                 </div>
               </div>
             </div>
@@ -1419,7 +1460,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
         </section>
 
         {/* Não acredite apenas nas nossas palavras */}
-        <section id="depoimentos" className="py-20 bg-white">
+        <section id="depoimentos" className="py-20 bg-transparent">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -1611,7 +1652,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
         </section>
 
         {/* Pricing */}
-        <section id="precos" className="py-20 bg-white">
+        <section id="precos" className="py-20 bg-transparent">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -1728,7 +1769,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
         </section>
 
         {/* FAQ Section */}
-        <section className="py-20 bg-white">
+        <section className="py-20 bg-transparent">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Perguntas Frequentes</h2>
@@ -1770,7 +1811,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
         </section>
 
         {/* Ainda tem dúvidas? Section */}
-        <section className="py-16 bg-white">
+        <section className="py-16 bg-transparent">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               Ainda tem dúvidas?
@@ -1789,7 +1830,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
         </section>
         
         {/* Footer Section */}
-        <footer className="bg-white border-t border-gray-200 mt-20">
+        <footer className="bg-white/75 backdrop-blur-sm border-t border-gray-200 mt-20">
           <div className="max-w-7xl mx-auto px-8 sm:px-10 lg:px-12 py-12">
         
             {/* LINHA DO LOGO (Agenda AI + powered by Dalzzen) */}
@@ -1802,8 +1843,8 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
               >
                 {/* Linha principal - Agenda AI */}
                 <div className="inline-flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-600 rounded-lg flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-white" />
+                  <div className="w-8 h-8 rounded-lg overflow-hidden">
+                    <img src="/images/Logo.png" alt="Logo Agenda AI" className="w-full h-full object-cover" />
                   </div>
                   <span
                     className="

@@ -28,10 +28,10 @@ export default function CentralAjuda() {
               to="/home"
               className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
             >
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-600 rounded-lg flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-600 rounded-full flex items-center justify-center overflow-hidden">
+                <img src="/images/Avatar.png" alt="Avatar" className="w-5 h-5 object-cover rounded-full" />
               </div>
-              <span className="text-2xl font-bold text-gray-900">Agenda AI</span>
+              <span className="text-2xl font-bold text-gray-900" style={{ fontFamily: '"Lexend", "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>Olli</span>
             </Link>
       
             {/* Desktop Navigation */}

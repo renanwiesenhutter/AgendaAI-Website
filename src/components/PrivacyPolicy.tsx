@@ -1,4 +1,4 @@
-import { Calendar, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 type PrivacySection = {
@@ -101,14 +101,14 @@ export default function PrivacyPolicy() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-white">
-      <header className="bg-white/95 backdrop-blur border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-[#f7fbff]">
+      <header className="bg-[#f7fbff]/95 backdrop-blur border-b border-gray-200 fixed top-0 left-0 right-0 z-50 h-14">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
           <Link to="/" className="flex items-center space-x-2 hover:opacity-85 transition-opacity">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-600 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
+              <img src="/images/Logo.png" alt="Logo" className="w-full h-full object-cover" />
             </div>
-            <span className="text-2xl font-bold text-gray-900">Agenda AI</span>
+            <span className="text-2xl font-bold text-gray-900" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>Agenda AI</span>
           </Link>
 
           <button
@@ -122,8 +122,8 @@ export default function PrivacyPolicy() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-0 sm:px-6 lg:px-8 pt-0 pb-10 sm:py-14">
-        <section className="bg-white rounded-none sm:rounded-3xl border-y sm:border border-gray-200 shadow-[0_18px_50px_-30px_rgba(30,64,175,0.35)] overflow-hidden">
+      <main className="max-w-5xl mx-auto px-0 sm:px-6 lg:px-8 pt-14 sm:pt-14 pb-0">
+        <section className="bg-[#f7fbff] rounded-none sm:rounded-3xl border-y sm:border border-gray-200 shadow-[0_18px_50px_-30px_rgba(30,64,175,0.35)] overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-green-600 px-6 sm:px-10 py-10 text-white">
             <div className="inline-flex items-center gap-2 bg-white/15 border border-white/30 rounded-full px-3 py-1 text-sm mb-4">
               <ShieldCheck className="w-4 h-4" />

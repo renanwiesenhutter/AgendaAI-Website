@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Calendar, CreditCard, Mail, UserRound, Smartphone, Lock, ChevronDown, Tag, X } from 'lucide-react';
+import { CreditCard, Mail, UserRound, Smartphone, Lock, ChevronDown, Tag, X } from 'lucide-react';
 import { useSearchParams, useLocation, Link } from "react-router-dom";
 import type { StripeElementsOptions } from '@stripe/stripe-js';
 import { loadStripe } from "@stripe/stripe-js";
@@ -1098,7 +1098,7 @@ function SuccessReceipt({ brand, amountCents }: { brand: string; amountCents: nu
               <span
                 className="mr-1 uppercase"
                 style={{
-                  fontFamily: "monospace",
+                  fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                   fontSize: "14px",
                   fontWeight: 600,     // regular
                   color: "#000",
@@ -1128,7 +1128,7 @@ function SuccessReceipt({ brand, amountCents }: { brand: string; amountCents: nu
               <span
                 className="ml-1 tabular-nums"
                 style={{
-                  fontFamily: "monospace",
+                  fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                   fontSize: "14px",
                   fontWeight: 100,
                   color: "#000",
@@ -1383,7 +1383,7 @@ const handlePhoneChange = React.useCallback(
       colorPrimary: '#0570de',
       colorBackground: '#ffffff',
       colorText: '#30313d',
-      fontFamily: 'Ideal Sans, system-ui, sans-serif',
+      fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       borderRadius: '8px',
     },
   };
@@ -1619,7 +1619,7 @@ React.useEffect(() => {
   }, []);
 
   return (
-    <div className="min-h-screen font-sans">
+    <div className="min-h-screen">
       {/* BG fixo mobile — só antes de pagar */}
       {uiState !== "success" && (
         <div className={`md:hidden fixed inset-0 -z-10 ${THEME_BG}`} />
@@ -1661,8 +1661,8 @@ React.useEffect(() => {
         <div className={`${THEME_BG} text-white`}>
           <div className="px-4 py-4">
             <div className="flex gap-3">
-              <div className="col-start-1 row-start-1 row-span-2 w-10 h-10 bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-white" />
+              <div className="col-start-1 row-start-1 row-span-2 w-10 h-10 bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center overflow-hidden">
+                <img src="/images/Logo.png" alt="Logo Agenda AI" className="w-full h-full object-cover" />
               </div>
             
               <div className="flex-1 flex items-start justify-between">
@@ -1916,8 +1916,8 @@ React.useEffect(() => {
               }`}
             >
               <div className="mb-4 flex justify-center">
-                <div className="w-32 h-32 rounded-lg bg-gradient-to-r from-blue-500 to-green-600 flex items-center justify-center shadow-md shadow-black/10">
-                  <Calendar className="w-16 h-16 text-white" />
+                <div className="w-32 h-32 rounded-lg bg-gradient-to-r from-blue-500 to-green-600 flex items-center justify-center shadow-md shadow-black/10 overflow-hidden">
+                  <img src="/images/Logo.png" alt="Logo Agenda AI" className="w-full h-full object-cover" />
                 </div>
               </div>
         
@@ -2041,8 +2041,8 @@ React.useEffect(() => {
           
             <div className="bg-white/0 backdrop-blur-sm rounded-lg pl-0 pr-4 py-4 mb-6">
               <div className="grid grid-cols-[2.5rem_1fr_auto] gap-x-3 items-start">
-                <div className="col-start-1 row-start-1 row-span-2 w-10 h-10 bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-white" />
+                <div className="col-start-1 row-start-1 row-span-2 w-10 h-10 bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center overflow-hidden">
+                  <img src="/images/Logo.png" alt="Logo Agenda AI" className="w-full h-full object-cover" />
                 </div>
 
                 <p className="col-start-2 text-sm font-medium leading-tight">
