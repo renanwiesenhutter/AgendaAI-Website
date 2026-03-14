@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Calendar, Menu } from "lucide-react";
+import { Calendar, ChevronDown, Menu } from "lucide-react";
 import { Link } from "react-router-dom";
 import { SiWhatsapp, SiInstagram } from "react-icons/si";
 
@@ -117,21 +117,37 @@ export default function CentralAjuda() {
       {/* CONTEÚDO */}
       <main className="flex-1 max-w-5xl mx-auto px-6 py-28">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Central de Ajuda</h1>
-        <div className="space-y-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
           {faqs.map((item, i) => (
-            <div key={i} className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+            <div
+              key={i}
+              className={`py-4 sm:py-6 ${i !== faqs.length - 1 ? "border-b border-gray-200" : ""}`}
+            >
               <button
                 onClick={() => setOpen(open === i ? null : i)}
-                className="w-full flex justify-between items-center px-6 py-4 text-left hover:bg-gray-50 transition"
+                className="w-full flex items-center justify-between gap-4 text-left"
+                aria-expanded={open === i}
               >
-                <span className="font-medium text-gray-900">{item.q}</span>
+                <span className="text-base sm:text-lg font-normal text-gray-900 leading-tight">{item.q}</span>
                 <ChevronDown
-                  className={`w-5 h-5 text-gray-500 transition-transform ${open === i ? "rotate-180" : ""}`}
+                  className={`w-5 h-5 shrink-0 text-gray-700 transition-transform duration-300 ${
+                    open === i ? "rotate-180" : ""
+                  }`}
+                  aria-hidden="true"
                 />
               </button>
-              {open === i && (
-                <div className="px-6 pb-4 text-gray-700 leading-relaxed">{item.a}</div>
-              )}
+              <div
+                className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  open === i
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0"
+                }`}
+                aria-hidden={open !== i}
+              >
+                <div className="overflow-hidden">
+                  <p className="pt-4 pr-8 text-gray-700 leading-relaxed">{item.a}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>

@@ -755,7 +755,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
   const faqData = [
     {
       question: "Como funciona o Agenda AI?",
-      answer: "O Agenda AI transforma a forma de organizar seus compromissos, utilizando Inteligência Artificial integrada ao WhatsApp para oferecer uma experiência prática e simplificada. Diferente de aplicativos tradicionais de agenda, o Agenda AI elimina a necessidade de abrir aplicativos complexos e permite que você registre compromissos de forma natural e rápida.\n\nBasta enviar uma mensagem de texto, um áudio ou até mesmo uma imagem (como um cartão de embarque, receita médica, comprovante de consulta ou avaliação acadêmica). A IA do Agenda AI processa automaticamente essas informações e adiciona ao seu calendário. Além disso, você recebe lembretes personalizados no WhatsApp, pode sincronizar com o Google Calendar e ter acesso a resumos diários para nunca esquecer um compromisso."
+      answer: "O Agenda AI organiza seus compromissos direto pelo WhatsApp. Você pode criar lembretes, tarefas e eventos de forma prática, e ele também pode se conectar ao seu calendário para reunir tudo em um só lugar. Assim, você recebe avisos, resumos e acompanha sua rotina com mais facilidade, sem precisar abrir vários aplicativos."
     },
     {
     question: "Preciso instalar algum aplicativo?",
@@ -766,8 +766,8 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
     answer: "Sim! Com o Agenda AI você pode configurar lembretes recorrentes de forma simples e rápida. Basta enviar uma mensagem no WhatsApp dizendo, por exemplo: \"Me lembre de tomar meu remédio todos os dias às 20h\" ou \"Agende minha aula de inglês toda segunda às 19h\".\n\nA inteligência artificial entende a recorrência e cria os eventos automaticamente no seu calendário, enviando notificações no WhatsApp sempre no horário definido."
     },
     {
-      question: "Como faço para integrar o Agenda AI com o Google Calendar?",
-      answer: "É bem simples! Assim que a sua conta for ativada após a compra, você receberá no WhatsApp uma mensagem com um link para conectar ao Google Calendar.\n\nBasta abrir o link, entrar na sua conta Google e clicar em continuar. Depois disso, seus compromissos passam a ser sincronizados automaticamente."
+      question: "Como eu integro o Agenda AI com o meu calendário?",
+      answer: "É bem simples! Assim que a sua conta for ativada após a compra, você receberá no WhatsApp uma mensagem com um link para conectar ao Google.\n\nBasta abrir o link, entrar na sua conta Google e clicar em continuar. Depois disso, seus compromissos passam a ser sincronizados automaticamente."
     },
     {
     question: "Como funciona o cancelamento?",
@@ -1765,37 +1765,44 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
         </section>
 
         {/* FAQ Section */}
-        <section className="py-20 bg-transparent">
+        <section className="py-20 bg-white">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Perguntas Frequentes</h2>
               <p className="text-xl text-gray-600">Tire suas dúvidas sobre o Agenda AI</p>
             </div>
 
-            <div className="space-y-4">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
               {faqData.map((faq, index) => (
-                <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div
+                  key={index}
+                  className={`py-4 sm:py-6 ${index !== faqData.length - 1 ? 'border-b border-gray-200' : ''}`}
+                >
                   <button
                     onClick={() => toggleFAQ(index)}
-                    className="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition-colors"
+                    className="w-full text-left flex items-center justify-between gap-4"
+                    aria-expanded={openFAQ === index}
                   >
-                    <span className="font-medium text-gray-900">{faq.question}</span>
-                    <ChevronDown 
-                      className={`w-5 h-5 text-gray-500 transition-transform duration-300 ease-out ${
+                    <span className="text-base sm:text-lg font-medium text-gray-900 leading-tight">
+                      {faq.question}
+                    </span>
+                    <ChevronDown
+                      className={`w-5 h-5 shrink-0 text-gray-700 transition-transform duration-300 ${
                         openFAQ === index ? 'rotate-180' : ''
                       }`}
+                      aria-hidden="true"
                     />
                   </button>
                   <div
-                    className={`overflow-hidden transition-[max-height,opacity,transform] ${
+                    className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                       openFAQ === index
-                        ? 'max-h-[800px] opacity-100 translate-y-0 duration-600 ease-out'
-                        : 'max-h-0 opacity-0 -translate-y-1 duration-800 delay-100 ease-in'
+                        ? 'grid-rows-[1fr] opacity-100'
+                        : 'grid-rows-[0fr] opacity-0'
                     }`}
                     aria-hidden={openFAQ !== index}
                   >
-                    <div className="px-6 pb-4">
-                      <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                    <div className="overflow-hidden">
+                      <p className="pt-4 pr-8 text-gray-700 leading-relaxed whitespace-pre-line">
                         {faq.answer}
                       </p>
                     </div>
@@ -1807,9 +1814,9 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
         </section>
 
         {/* Ainda tem dúvidas? Section */}
-        <section className="py-16 bg-transparent">
+        <section className="py-16 bg-white mt-[-80px]">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
               Ainda tem dúvidas?
             </h2>
             <p className="text-xl text-gray-600 mb-8">
@@ -1818,15 +1825,15 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
             <a href="https://wa.me/5545991453366?text=Ol%C3%A1%21%20Gostaria%20de%20ajuda%20com%20o%20Agenda%20AI" 
               target="_blank" 
               rel="noopener noreferrer" 
-              className="inline-flex items-center space-x-3 bg-green-500 text-white px-8 py-4 rounded-lg hover:bg-green-600 hover:shadow-lg transition-all duration-300 ease-out font-medium text-lg shadow-md">
-              <SiWhatsapp className="w-6 h-6" />
+              className="inline-flex items-center space-x-2.5 bg-green-500 text-white px-7 py-3.5 rounded-lg hover:bg-green-600 hover:shadow-lg transition-all duration-300 ease-out font-medium text-base shadow-md">
+              <SiWhatsapp className="w-5 h-5" />
               <span>Fale com nossa equipe</span>
             </a>
           </div>
         </section>
         
         {/* Footer Section */}
-        <footer className="bg-white/75 backdrop-blur-sm border-t border-gray-200 mt-20">
+        <footer className="bg-white/75 backdrop-blur-sm border-t border-gray-200">
           <div className="max-w-7xl mx-auto px-8 sm:px-10 lg:px-12 py-12">
         
             {/* LINHA DO LOGO (Agenda AI + powered by Dalzzen) */}
