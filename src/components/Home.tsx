@@ -963,19 +963,15 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
       {/* Add padding to account for fixed header */}
       <div className="pt-10">
         {/* Hero Section */}
-        <section className="bg-transparent pt-6 pb-20 md:pt-8">
+        <section className="bg-transparent pt-6 pb-20 pt-6 md:pt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-12 items-center text-center lg:text-left">
               {/* Left Content */}
               <div>
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-8">
                   Agende compromissos pelo
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-green-500"> WhatsApp</span>
                 </h1>
-                <p className="text-xl md:text-2xl text-gray-600 mb-8">
-                  Envie mensagens de texto ou áudio e a nossa IA agenda automaticamente no seu Calendário. 
-                  Receba lembretes direto no WhatsApp.
-                </p>
                 <div className="mb-8">
                   <a 
                   href="#precos" 
@@ -1139,7 +1135,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                   <div className="mb-5 flex justify-center">
                     <img src="/images/CalendarIcon.png" alt="Calendar" className="w-16 h-16 object-contain drop-shadow-[0_2px_6px_rgba(15,23,42,0.14)]" />
                   </div>
-                  <h3 className="text-2xl md:text-4xl font-bold text-gray-900 mb-5 text-center">Sincronização com o Calendário</h3>
+                  <h3 className="text-2xl md:text-4xl font-bold text-gray-900 mb-5 text-center">Integração com o Calendário</h3>
                   <p className="text-base md:text-lg text-gray-600 leading-relaxed text-center">
                     Todos os seus compromissos são automaticamente sincronizados com o seu calendário Google ou Apple. Tenha acesso fácil e imediato aos seus eventos em qualquer dispositivo, em tempo real.
                   </p>
@@ -1163,9 +1159,9 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                   <div className="mb-5 flex justify-center">
                     <img src="/images/ClockIcon.png" alt="Clock" className="w-16 h-16 object-contain drop-shadow-[0_2px_6px_rgba(15,23,42,0.14)]" />
                   </div>
-                  <h3 className="text-2xl md:text-4xl font-bold text-gray-900 mb-5 text-center">Lembretes Inteligentes</h3>
+                  <h3 className="text-2xl md:text-4xl font-bold text-gray-900 mb-5 text-center">Lembretes Personalizados</h3>
                   <p className="text-base md:text-lg text-gray-600 leading-relaxed text-center">
-                    Você escolhe como e quando quer ser lembrado. Defina facilmente o tempo de antecedência dos lembretes e receba avisos personalizados diretamente no WhatsApp, do jeito que você preferir.
+                    Você escolhe como e quando quer ser lembrado. Defina facilmente avisos com antecedência e receba avisos personalizados diretamente no WhatsApp, do jeito que você preferir.
                   </p>
                 </div>
                 <div className="order-2">
@@ -1189,7 +1185,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                   </div>
                   <h3 className="text-2xl md:text-4xl font-bold text-gray-900 mb-5 text-center">Resumo Diário</h3>
                   <p className="text-base md:text-lg text-gray-600 leading-relaxed text-center">
-                    Receba toda manhã um resumo completo dos seus compromissos e afazeres do dia, diretamente no WhatsApp. Comece o dia sabendo exatamente o que precisa ser feito.
+                    Receba todos os dias pela manhã um resumo completo dos seus compromissos e afazeres do dia, diretamente no WhatsApp. Comece o dia sabendo exatamente o que precisa ser feito.
                   </p>
                 </div>
                 <div className="order-2 lg:order-1">
