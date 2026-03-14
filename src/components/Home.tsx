@@ -1213,7 +1213,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                 Interaja com o Agenda AI 24h por dia
               </h2>
               <p className="text-xl text-gray-600">
-                Pergunte o que quiser e como quiser sobre os seus compromissos e lembretes. Veja alguns exemplos abaixo.
+                Pergunte o que quiser sobre os seus compromissos e lembretes.<br/> Veja alguns exemplos abaixo.
               </p>
             </div>
 
@@ -1655,7 +1655,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                 Escolha seu Plano
               </h2>
               <p className="text-xl text-gray-600">
-                Comece agora mesmo a organizar sua rotina
+                Comece agora mesmo a <br/>organizar sua rotina
               </p>
             </div>
 
@@ -1819,7 +1819,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
               Ainda tem dúvidas?
             </h2>
-            <p className="text-xl text-gray-600 mb-8">
+            <p className="text-lg text-gray-600 mb-8">
               Nossa equipe está pronta para ajudar e responder a todas as suas perguntas.
             </p>
             <a href="https://wa.me/5545991453366?text=Ol%C3%A1%21%20Gostaria%20de%20ajuda%20com%20o%20Agenda%20AI" 
