@@ -1050,6 +1050,10 @@ const THEME_BG = isAnnual
   ? "bg-gradient-to-r from-blue-500 to-green-600" // anual
   : "bg-blue-600";                                  // mensal (mesmo azul do botão "Assinar")
 
+const OVERSCROLL_BG = isAnnual
+  ? "linear-gradient(90deg, #3b82f6 0%, #16a34a 100%)"
+  : "#2563eb";
+
 {/* === CSS do recibo (coloque dentro do JSX da página) === */}
 <style>{`
 @keyframes check-draw { to { stroke-dashoffset: 0 } }
@@ -1314,6 +1318,8 @@ const handlePhoneChange = React.useCallback(
 
   // 1) State para guardar o client_secret (mantém o seu)
   const [clientSecret, setClientSecret] = React.useState<string | null>(null);
+  const [checkoutAssetsReady, setCheckoutAssetsReady] = React.useState(false);
+  const [bootVisible, setBootVisible] = React.useState(true);
   const setupInitTimerRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
@@ -1618,8 +1624,134 @@ React.useEffect(() => {
     setIsIOS(/iPad|iPhone|iPod/.test(userAgent));
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const waitForImage = (src: string) =>
+      new Promise<void>((resolve) => {
+        const image = new Image();
+        const finish = () => resolve();
+        image.onload = finish;
+        image.onerror = finish;
+        image.src = src;
+        if (image.complete) {
+          resolve();
+        }
+      });
+
+    Promise.all([waitForImage('/images/Logo.png'), waitForImage('/images/Logomarca.png')]).then(() => {
+      if (!cancelled) {
+        setCheckoutAssetsReady(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const paymentSurfaceReady = Boolean(clientSecret) || uiState === 'success' || lookup.hasActive;
+    if (!checkoutAssetsReady || !paymentSurfaceReady) return;
+
+    const timeoutId = window.setTimeout(() => setBootVisible(false), 220);
+    return () => window.clearTimeout(timeoutId);
+  }, [checkoutAssetsReady, clientSecret, uiState, lookup.hasActive]);
+
+  useEffect(() => {
+    const failSafeId = window.setTimeout(() => setBootVisible(false), 2600);
+    return () => window.clearTimeout(failSafeId);
+  }, []);
+
+  useEffect(() => {
+    const prevHtmlBackground = document.documentElement.style.background;
+    const prevBodyBackground = document.body.style.background;
+
+    document.documentElement.style.background = OVERSCROLL_BG;
+    document.body.style.background = OVERSCROLL_BG;
+
+    return () => {
+      document.documentElement.style.background = prevHtmlBackground;
+      document.body.style.background = prevBodyBackground;
+    };
+  }, [OVERSCROLL_BG]);
+
+  if (bootVisible) {
+    return (
+      <main className="min-h-[100dvh]">
+        <div className="lg:hidden min-h-[100dvh] bg-[#f2f2f4] px-6 py-8">
+          <div className="mx-auto mt-[16dvh] w-full max-w-[780px]">
+            <div className="mt-20 flex flex-col items-center">
+              <div className="checkout-skeleton-shimmer h-8 w-40 rounded-full bg-[#e6e6e8]" />
+              <div className="checkout-skeleton-shimmer mt-4 h-10 w-56 rounded-[18px] bg-[#e6e6e8]" />
+            </div>
+
+            <div className="mt-24 space-y-4">
+              <div className="checkout-skeleton-shimmer h-20 w-full rounded-2xl bg-[#e6e6e8]" />
+              <div className="checkout-skeleton-shimmer h-20 w-full rounded-2xl bg-[#e6e6e8]" />
+              <div className="checkout-skeleton-shimmer mx-auto h-8 w-[68%] rounded-full bg-[#e6e6e8]" />
+            </div>
+          </div>
+        </div>
+
+        <div className="hidden min-h-[100dvh] lg:flex">
+          <section className={`w-1/2 ${THEME_BG} px-10 py-10 text-white`}>
+            <div className="mx-auto mt-[7vh] w-full max-w-[380px]">
+              <div className="checkout-skeleton-shimmer h-7 w-7 rounded-full bg-white/22" />
+              <div className="checkout-skeleton-shimmer mt-8 h-4 w-20 rounded-full bg-white/22" />
+              <div className="checkout-skeleton-shimmer mt-3 h-7 w-28 rounded-full bg-white/22" />
+              <div className="checkout-skeleton-shimmer mt-7 h-[284px] w-full rounded-lg bg-white/18" />
+            </div>
+          </section>
+
+          <section className="w-1/2 bg-[#f2f2f4] px-10 py-10">
+            <div className="mx-auto mt-[6vh] w-full max-w-[420px]">
+              <div className="checkout-skeleton-shimmer h-12 w-full rounded-xl bg-[#e6e6e8]" />
+              <div className="checkout-skeleton-shimmer mt-8 h-6 w-[38%] rounded-full bg-[#e6e6e8]" />
+              <div className="checkout-skeleton-shimmer mt-3 h-12 w-full rounded-xl bg-[#e6e6e8]" />
+              <div className="checkout-skeleton-shimmer mt-8 h-6 w-[32%] rounded-full bg-[#e6e6e8]" />
+              <div className="checkout-skeleton-shimmer mt-3 h-16 w-full rounded-xl bg-[#e6e6e8]" />
+              <div className="checkout-skeleton-shimmer mt-5 h-16 w-full rounded-xl bg-[#e6e6e8]" />
+              <div className="checkout-skeleton-shimmer mt-5 h-16 w-full rounded-xl bg-[#e6e6e8]" />
+              <div className="checkout-skeleton-shimmer mt-6 h-12 w-full rounded-xl bg-[#e6e6e8]" />
+              <div className="checkout-skeleton-shimmer mt-6 mx-auto h-6 w-[52%] rounded-full bg-[#e6e6e8]" />
+            </div>
+          </section>
+        </div>
+
+        <style>{`
+          .checkout-skeleton-shimmer {
+            position: relative;
+            overflow: hidden;
+          }
+
+          .checkout-skeleton-shimmer::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            transform: translateX(-100%);
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.42) 48%, rgba(255,255,255,0) 100%);
+            animation: checkout-skeleton-wave 1.2s ease-in-out infinite;
+          }
+
+          @keyframes checkout-skeleton-wave {
+            to {
+              transform: translateX(100%);
+            }
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .checkout-skeleton-shimmer::after {
+              animation: none;
+            }
+          }
+        `}</style>
+      </main>
+    );
+  }
+
   return (
-    <div className="min-h-screen">
+    <div className={`min-h-screen ${THEME_BG} md:bg-transparent`}>
       {/* BG fixo mobile — só antes de pagar */}
       {uiState !== "success" && (
         <div className={`md:hidden fixed inset-0 -z-10 ${THEME_BG}`} />
@@ -1895,7 +2027,7 @@ React.useEffect(() => {
           uiState === "success"
             ? "min-h-[100dvh] pt-0 md:pt-0"
             : "min-h-screen pt-14 md:pt-0"
-        }`}
+        } ${THEME_BG} md:bg-transparent`}
         >
         {/* COLUNA ESQUERDA */}
         <aside

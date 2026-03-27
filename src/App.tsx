@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Home from './components/Home';
 import Checkout from './components/Checkout';
+import Login from './components/Login';
+import Conta from './components/Conta';
 import TermsOfUse from './components/TermsOfUse';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import GoogleConnected from './components/GoogleConnected';
@@ -24,6 +26,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/checkout" element={<Checkout />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/conta" element={<Conta />} />
       <Route path="/termos-de-uso" element={<TermsOfUse />} />
       <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
       <Route path="/google/conectado" element={<GoogleConnected />} />

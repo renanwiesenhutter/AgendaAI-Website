@@ -10,6 +10,262 @@ const HEADER_SECTIONS = [
   { id: 'precos', label: 'Preços', width: 48 },
 ] as const;
 
+const groupPlayingRegistry: Record<string, string | null> = {};
+
+function AutoPlayVideo({
+  id,
+  group = "steps",
+  src,
+  className = "",
+  playThreshold = 0.65,
+  margin = "-25% 0px -25% 0px",
+  poster,
+  preload = "metadata",
+}: {
+  id: string;
+  group?: string;
+  src: string;
+  className?: string;
+  playThreshold?: number;
+  margin?: string;
+  poster?: string;
+  preload?: "none" | "metadata" | "auto";
+}) {
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const posterRef = React.useRef<HTMLImageElement>(null);
+  const loaderRef = React.useRef<HTMLDivElement>(null);
+  const revealedRef = React.useRef(false);
+  const posterFadeTimerRef = React.useRef<number | null>(null);
+
+  const [userPaused, setUserPaused] = React.useState(false);
+  const [showOverlayIcon, setShowOverlayIcon] = React.useState(false);
+  const [isReady, setIsReady] = React.useState(false);
+
+  const claimingRef = React.useRef(false);
+  const destroyedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!src) return;
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "video";
+    // @ts-ignore
+    link.fetchPriority = "high";
+    link.href = src;
+    document.head.appendChild(link);
+    return () => {
+      try { document.head.removeChild(link); } catch {}
+    };
+  }, [src]);
+
+  React.useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    destroyedRef.current = false;
+
+    el.preload = "auto";
+    el.muted = true;
+    (el as any).playsInline = true;
+
+    const onMeta = () => { !destroyedRef.current && setIsReady(true); };
+    el.addEventListener("loadedmetadata", onMeta);
+    el.addEventListener("loadeddata", onMeta);
+    el.addEventListener("canplay", onMeta);
+    try { el.load(); } catch {}
+
+    return () => {
+      destroyedRef.current = true;
+      if (posterFadeTimerRef.current) {
+        window.clearTimeout(posterFadeTimerRef.current);
+        posterFadeTimerRef.current = null;
+      }
+      el.removeEventListener("loadedmetadata", onMeta);
+      el.removeEventListener("loadeddata", onMeta);
+      el.removeEventListener("canplay", onMeta);
+    };
+  }, [src]);
+
+  React.useEffect(() => {
+    const onOtherPlay = (e: any) => {
+      const d = e.detail || {};
+      if (d.group === group && d.id !== id) {
+        const el = videoRef.current;
+        if (!el) return;
+        el.pause();
+        setShowOverlayIcon(false);
+      }
+    };
+    window.addEventListener("autoplay-group-play", onOtherPlay as any);
+    return () => window.removeEventListener("autoplay-group-play", onOtherPlay as any);
+  }, [group, id]);
+
+  const waitUntil = (el: HTMLVideoElement, cond: () => boolean, ev: string) =>
+    new Promise<void>((resolve) => {
+      if (cond()) return resolve();
+      const on = () => { if (cond()) { el.removeEventListener(ev, on); resolve(); } };
+      el.addEventListener(ev, on);
+    });
+
+  const safePlayFromZero = async (el: HTMLVideoElement) => {
+    if (!isReady || el.readyState < 3) {
+      await waitUntil(el, () => el.readyState >= 3, "canplay");
+    }
+    try {
+      if (el.currentTime !== 0) el.currentTime = 0;
+    } catch {}
+    await Promise.race([
+      waitUntil(el, () => Math.abs(el.currentTime - 0) < 0.001, "seeked"),
+      new Promise<void>(r => setTimeout(r, 120)),
+    ]);
+    await new Promise(r => requestAnimationFrame(() => r(null as any)));
+    try { await el.play(); } catch {}
+  };
+
+  const claimAndPlayFromStart = async () => {
+    const el = videoRef.current;
+    if (!el || claimingRef.current) return;
+    claimingRef.current = true;
+
+    groupPlayingRegistry[group] = id;
+    window.dispatchEvent(new CustomEvent("autoplay-group-play", { detail: { group, id } } as any));
+
+    await safePlayFromZero(el);
+    if (!destroyedRef.current) setShowOverlayIcon(false);
+
+    claimingRef.current = false;
+  };
+
+  const revealVideo = React.useCallback(() => {
+    if (revealedRef.current) return;
+    revealedRef.current = true;
+    const v = videoRef.current;
+    if (v) v.style.opacity = "1";
+    if (posterRef.current) {
+      posterRef.current.style.opacity = "0";
+      posterFadeTimerRef.current = window.setTimeout(() => {
+        if (posterRef.current) posterRef.current.style.display = "none";
+      }, 220);
+    }
+    if (loaderRef.current) loaderRef.current.classList.add("hidden");
+  }, []);
+
+  React.useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+
+    const io = new IntersectionObserver(
+      async ([entry]) => {
+        const enough = entry.isIntersecting && entry.intersectionRatio >= playThreshold;
+
+        if (enough && !userPaused) {
+          if (!isReady) return;
+          if (!destroyedRef.current) setShowOverlayIcon(false);
+          if (groupPlayingRegistry[group] !== id) {
+            await claimAndPlayFromStart();
+          } else {
+            await safePlayFromZero(el);
+            if (!destroyedRef.current) setShowOverlayIcon(false);
+          }
+        } else {
+          el.pause();
+          if (!destroyedRef.current && userPaused) setShowOverlayIcon(true);
+          if (groupPlayingRegistry[group] === id) groupPlayingRegistry[group] = null;
+        }
+      },
+      { root: null, rootMargin: margin, threshold: [0, playThreshold, 0.99] }
+    );
+
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      if (groupPlayingRegistry[group] === id) groupPlayingRegistry[group] = null;
+    };
+  }, [group, id, playThreshold, margin, userPaused, isReady]);
+
+  const handleClick = async () => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) {
+      setUserPaused(false);
+      await claimAndPlayFromStart();
+    } else {
+      el.pause();
+      setUserPaused(true);
+      setShowOverlayIcon(true);
+      if (groupPlayingRegistry[group] === id) groupPlayingRegistry[group] = null;
+    }
+  };
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl ${className}`}>
+      {poster && (
+        <img
+          ref={posterRef}
+          id={`poster-${id}`}
+          src={poster}
+          alt="Poster do vídeo"
+          className="absolute inset-0 w-full h-full object-cover rounded-2xl z-10 select-none pointer-events-none transition-opacity duration-200"
+          draggable={false}
+        />
+      )}
+
+      <div
+        ref={loaderRef}
+        id={`loader-${id}`}
+        className="absolute inset-0 flex items-center justify-center z-20 bg-black/40"
+      >
+        <div className="w-10 h-10 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+      </div>
+
+      <video
+        ref={videoRef}
+        className="w-full h-full object-cover rounded-2xl"
+        muted
+        loop
+        playsInline
+        preload={preload}
+        poster={poster}
+        onLoadedData={() => {
+          setIsReady(true);
+          if (loaderRef.current) loaderRef.current.classList.add("hidden");
+        }}
+        onError={() => {
+          setIsReady(true);
+          if (loaderRef.current) loaderRef.current.classList.add("hidden");
+        }}
+        onPlaying={revealVideo}
+        onTimeUpdate={() => {
+          const v = videoRef.current;
+          if (!v || revealedRef.current) return;
+          if (v.currentTime > 0.03) revealVideo();
+        }}
+        onPause={() => {
+          if (userPaused) setShowOverlayIcon(true);
+        }}
+        onPlay={() => setShowOverlayIcon(false)}
+      >
+        <source src={src} type="video/mp4" />
+      </video>
+
+      <button
+        onClick={handleClick}
+        className={`absolute inset-0 z-[30] flex items-center justify-center transition ${
+          showOverlayIcon ? "bg-black/55 hover:bg-black/45" : "bg-transparent"
+        }`}
+        aria-label={showOverlayIcon ? "Reproduzir vídeo" : "Pausar vídeo"}
+      >
+        {showOverlayIcon && (
+          <span className="bg-white/95 rounded-full p-6 shadow-lg">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
+              <path d="M8 5v14l11-7-11-7z" fill="black" />
+            </svg>
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
 function Home() {
   const [fullscreenMedia, setFullscreenMedia] = useState<{ type: 'image' | 'video', src: string } | null>(null);
   const [imgLoading, setImgLoading] = useState(false);
@@ -27,9 +283,10 @@ function Home() {
   const loginBlobRightRef = useRef<HTMLSpanElement>(null);
   const loginInnerBorderRef = useRef<HTMLSpanElement>(null);
   const scrollAnimationRef = useRef<number | null>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuPanelRef = useRef<HTMLDivElement>(null);
   const sectionIndexRef = useRef(0);
   const sectionInitRef = useRef(false);
-  const groupPlaying: Record<string, string | null> = {};
   const IS_IOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   // Scroll Para a Seção Correta
@@ -268,275 +525,6 @@ function Home() {
 function openFullscreen(type: "image", src: string) {
   setImgLoading(true);
   setFullscreenMedia({ type, src });
-}
-
-// Steps Autoplay
-function AutoPlayVideo({
-  id,
-  group = "steps",
-  src,
-  className = "",
-  playThreshold = 0.65,
-  margin = "-25% 0px -25% 0px",
-  poster,
-  preload = "metadata",
-}: {
-  id: string;
-  group?: string;
-  src: string;
-  className?: string;
-  playThreshold?: number;
-  margin?: string;
-  poster?: string;
-  preload?: "none" | "metadata" | "auto";
-}) {
-  const videoRef = React.useRef<HTMLVideoElement>(null);
-  const posterRef = React.useRef<HTMLImageElement>(null);
-  const loaderRef = React.useRef<HTMLDivElement>(null);
-  const revealedRef = React.useRef(false);
-  const posterFadeTimerRef = React.useRef<number | null>(null);
-
-  const [userPaused, setUserPaused] = React.useState(false);
-  const [showOverlayIcon, setShowOverlayIcon] = React.useState(false);
-  const [isReady, setIsReady] = React.useState(false);
-
-  const claimingRef = React.useRef(false);
-  const destroyedRef = React.useRef(false);
-
-  // Preload do arquivo
-  React.useEffect(() => {
-    if (!src) return;
-    const link = document.createElement("link");
-    link.rel = "preload";
-    link.as = "video";
-    // @ts-ignore
-    link.fetchPriority = "high";
-    link.href = src;
-    document.head.appendChild(link);
-    return () => {
-      try { document.head.removeChild(link); } catch {}
-    };
-  }, [src]);
-
-  // Pipeline inicial do <video>
-  React.useEffect(() => {
-    const el = videoRef.current;
-    if (!el) return;
-    destroyedRef.current = false;
-
-    el.preload = "auto";
-    el.muted = true;
-    (el as any).playsInline = true;
-
-    const onMeta = () => { !destroyedRef.current && setIsReady(true); };
-    el.addEventListener("loadedmetadata", onMeta);
-    el.addEventListener("loadeddata", onMeta);
-    el.addEventListener("canplay", onMeta);
-    try { el.load(); } catch {}
-
-    return () => {
-      destroyedRef.current = true;
-      if (posterFadeTimerRef.current) {
-        window.clearTimeout(posterFadeTimerRef.current);
-        posterFadeTimerRef.current = null;
-      }
-      el.removeEventListener("loadedmetadata", onMeta);
-      el.removeEventListener("loadeddata", onMeta);
-      el.removeEventListener("canplay", onMeta);
-    };
-  }, [src]);
-
-  // Pause quando outro do mesmo grupo tocar
-  React.useEffect(() => {
-    const onOtherPlay = (e: any) => {
-      const d = e.detail || {};
-      if (d.group === group && d.id !== id) {
-        const el = videoRef.current;
-        if (!el) return;
-        el.pause();
-        setShowOverlayIcon(false);
-      }
-    };
-    window.addEventListener("autoplay-group-play", onOtherPlay as any);
-    return () => window.removeEventListener("autoplay-group-play", onOtherPlay as any);
-  }, [group, id]);
-
-  // Helpers
-  const waitUntil = (el: HTMLVideoElement, cond: () => boolean, ev: string) =>
-    new Promise<void>((resolve) => {
-      if (cond()) return resolve();
-      const on = () => { if (cond()) { el.removeEventListener(ev, on); resolve(); } };
-      el.addEventListener(ev, on);
-    });
-
-  const safePlayFromZero = async (el: HTMLVideoElement) => {
-    if (!isReady || el.readyState < 3) {
-      await waitUntil(el, () => el.readyState >= 3, "canplay");
-    }
-    try {
-      if (el.currentTime !== 0) el.currentTime = 0;
-    } catch {}
-    await Promise.race([
-      waitUntil(el, () => Math.abs(el.currentTime - 0) < 0.001, "seeked"),
-      new Promise<void>(r => setTimeout(r, 120)),
-    ]);
-    await new Promise(r => requestAnimationFrame(() => r(null as any)));
-    try { await el.play(); } catch {}
-  };
-
-  const claimAndPlayFromStart = async () => {
-    const el = videoRef.current;
-    if (!el || claimingRef.current) return;
-    claimingRef.current = true;
-
-    // @ts-ignore
-    groupPlaying[group] = id;
-    window.dispatchEvent(new CustomEvent("autoplay-group-play", { detail: { group, id } } as any));
-
-    await safePlayFromZero(el);
-    if (!destroyedRef.current) setShowOverlayIcon(false);
-
-    claimingRef.current = false;
-  };
-
-  const revealVideo = React.useCallback(() => {
-    if (revealedRef.current) return;
-    revealedRef.current = true;
-    const v = videoRef.current;
-    if (v) v.style.opacity = "1";
-    if (posterRef.current) {
-      posterRef.current.style.opacity = "0";
-      posterFadeTimerRef.current = window.setTimeout(() => {
-        if (posterRef.current) posterRef.current.style.display = "none";
-      }, 220);
-    }
-    if (loaderRef.current) loaderRef.current.classList.add("hidden");
-  }, []);
-
-  // Autoplay com IntersectionObserver
-  React.useEffect(() => {
-    const el = videoRef.current;
-    if (!el) return;
-
-    const io = new IntersectionObserver(
-      async ([entry]) => {
-        const enough = entry.isIntersecting && entry.intersectionRatio >= playThreshold;
-
-        if (enough && !userPaused) {
-          if (!isReady) return;
-          if (!destroyedRef.current) setShowOverlayIcon(false);
-          // @ts-ignore
-          if (groupPlaying[group] !== id) {
-            await claimAndPlayFromStart();
-          } else {
-            await safePlayFromZero(el);
-            if (!destroyedRef.current) setShowOverlayIcon(false);
-          }
-        } else {
-          el.pause();
-          if (!destroyedRef.current && userPaused) setShowOverlayIcon(true);
-          // @ts-ignore
-          if (groupPlaying[group] === id) groupPlaying[group] = null;
-        }
-      },
-      { root: null, rootMargin: margin, threshold: [0, playThreshold, 0.99] }
-    );
-
-    io.observe(el);
-    return () => {
-      io.disconnect();
-      // @ts-ignore
-      if (groupPlaying[group] === id) groupPlaying[group] = null;
-    };
-  }, [group, id, playThreshold, margin, userPaused, isReady]);
-
-  const handleClick = async () => {
-    const el = videoRef.current;
-    if (!el) return;
-    if (el.paused) {
-      setUserPaused(false);
-      await claimAndPlayFromStart();
-    } else {
-      el.pause();
-      setUserPaused(true);
-      setShowOverlayIcon(true);
-      // @ts-ignore
-      if (groupPlaying[group] === id) groupPlaying[group] = null;
-    }
-  };
-
-  return (
-    <div className={`relative overflow-hidden rounded-2xl ${className}`}>
-      {/* Poster fixo até carregar */}
-      {poster && (
-        <img
-          ref={posterRef}
-          id={`poster-${id}`}
-          src={poster}
-          alt="Poster do vídeo"
-          className="absolute inset-0 w-full h-full object-cover rounded-2xl z-10 select-none pointer-events-none transition-opacity duration-200"
-          draggable={false}
-        />
-      )}
-
-      {/* Loader */}
-      <div
-        ref={loaderRef}
-        id={`loader-${id}`}
-        className="absolute inset-0 flex items-center justify-center z-20 bg-black/40"
-      >
-        <div className="w-10 h-10 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-      </div>
-
-      {/* Video */}
-      <video
-        ref={videoRef}
-        className="w-full h-full object-cover rounded-2xl"
-        muted
-        loop
-        playsInline
-        preload={preload}
-        poster={poster}
-        onLoadedData={() => {
-          setIsReady(true);
-          if (loaderRef.current) loaderRef.current.classList.add("hidden");
-        }}
-        onError={() => {
-          setIsReady(true);
-          if (loaderRef.current) loaderRef.current.classList.add("hidden");
-        }}
-        onPlaying={revealVideo}
-        onTimeUpdate={() => {
-          const v = videoRef.current;
-          if (!v || revealedRef.current) return;
-          if (v.currentTime > 0.03) revealVideo();
-        }}
-        onPause={() => {
-          if (userPaused) setShowOverlayIcon(true);
-        }}
-        onPlay={() => setShowOverlayIcon(false)}
-      >
-        <source src={src} type="video/mp4" />
-      </video>
-
-      {/* Overlay botão play/pause */}
-      <button
-        onClick={handleClick}
-        className={`absolute inset-0 z-[30] flex items-center justify-center transition ${
-          showOverlayIcon ? "bg-black/55 hover:bg-black/45" : "bg-transparent"
-        }`}
-        aria-label={showOverlayIcon ? "Reproduzir vídeo" : "Pausar vídeo"}
-      >
-        {showOverlayIcon && (
-          <span className="bg-white/95 rounded-full p-6 shadow-lg">
-            <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-              <path d="M8 5v14l11-7-11-7z" fill="black" />
-            </svg>
-          </span>
-        )}
-      </button>
-    </div>
-  );
 }
 
 // ===== Depoimentos (carrossel) =====
@@ -788,6 +776,40 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
   };
 
   useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    let closeScheduled = false;
+
+    const closeOnScroll = () => {
+      if (closeScheduled) return;
+      closeScheduled = true;
+      requestAnimationFrame(() => {
+        setMobileMenuOpen(false);
+        closeScheduled = false;
+      });
+    };
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      const targetNode = event.target as Node | null;
+      if (!targetNode) return;
+
+      const clickedToggle = mobileMenuButtonRef.current?.contains(targetNode);
+      const clickedPanel = mobileMenuPanelRef.current?.contains(targetNode);
+      if (clickedToggle || clickedPanel) return;
+
+      setMobileMenuOpen(false);
+    };
+
+    window.addEventListener('scroll', closeOnScroll, { passive: true });
+    document.addEventListener('click', closeOnOutsideClick);
+
+    return () => {
+      window.removeEventListener('scroll', closeOnScroll);
+      document.removeEventListener('click', closeOnOutsideClick);
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
     let ticking = false;
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -906,6 +928,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex items-center justify-between h-10" ref={headerBarRef}>
             <button
+              ref={mobileMenuButtonRef}
               type="button"
               onClick={toggleMobileMenu}
               className="inline-flex h-full items-center gap-[1px] text-gray-800 hover:opacity-80 transition-opacity"
@@ -930,11 +953,9 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
               <span className="text-[16px] font-bold text-gray-900 leading-none" style={{ fontFamily: '"#Lexend", "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>Agenda AI</span>
             </a>
 
-            <a
+            <Link
               ref={loginPillRef}
-              href="https://billing.stripe.com/p/login/dRm4gy9hC2DGd8cgVA5ZC00"
-              target="_blank"
-              rel="noopener noreferrer"
+              to="/login"
               className="relative isolate inline-flex h-8 items-center justify-center overflow-hidden rounded-full px-4 text-sm font-medium text-slate-800 border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.56)_0%,rgba(255,255,255,0.18)_100%)] backdrop-blur-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.98),inset_0_-1px_0_rgba(255,255,255,0.45),0_8px_18px_-12px_rgba(15,23,42,0.42)] ring-1 ring-white/55 transition-[background-color,color,box-shadow] duration-300"
             >
               <span ref={loginSheenRef} className="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(100%_70%_at_15%_0%,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0)_72%)] transition-[transform,opacity] duration-500 ease-out" />
@@ -942,16 +963,21 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
               <span ref={loginBlobRightRef} className="pointer-events-none absolute -right-3 top-1 h-6 w-6 rounded-full bg-fuchsia-300/35 blur-md transition-[transform,opacity] duration-500 ease-out" />
               <span ref={loginInnerBorderRef} className="pointer-events-none absolute inset-[1px] rounded-full border border-white/35 transition-opacity duration-300" />
               <span className="relative z-10">Login</span>
-            </a>
+            </Link>
           </div>
         </div>
 
         <div
+          ref={mobileMenuPanelRef}
           id="home-sections-menu"
           className={`absolute top-full left-0 right-0 grid overflow-hidden bg-[#f3f3f4] will-change-[grid-template-rows,opacity] transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${mobileMenuOpen ? "grid-rows-[1fr] opacity-100 border-t border-gray-200 pointer-events-auto" : "grid-rows-[0fr] opacity-0 border-t-0 pointer-events-none"}`}
+          style={{ transitionDuration: mobileMenuOpen ? '500ms' : '820ms' }}
           aria-hidden={!mobileMenuOpen}
         >
-          <nav className={`max-w-7xl mx-auto min-h-0 w-full overflow-hidden px-4 sm:px-6 lg:px-8 py-2 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${mobileMenuOpen ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}>
+          <nav
+            className={`max-w-7xl mx-auto min-h-0 w-full overflow-hidden px-4 sm:px-6 lg:px-8 py-2 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${mobileMenuOpen ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}
+            style={{ transitionDuration: mobileMenuOpen ? '500ms' : '820ms' }}
+          >
             <a href="#top" onClick={closeMobileMenu} className="block py-3 text-xl font-semibold text-gray-900">Início</a>
             <a href="#como-funciona" onClick={closeMobileMenu} className="block py-3 text-xl font-semibold text-gray-900">Como funciona</a>
             <a href="#depoimentos" onClick={closeMobileMenu} className="block py-3 text-xl font-semibold text-gray-900">Avaliações</a>
@@ -1017,7 +1043,7 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                         src="/images/MockupCover.webp"
                         alt="Poster do vídeo"
                         className="absolute inset-0 w-full h-full object-cover rounded-[2.5rem] z-10 select-none pointer-events-none"
-                        loading="lazy"
+                        loading="eager"
                         fetchPriority="high"
                         draggable={false}
                       />

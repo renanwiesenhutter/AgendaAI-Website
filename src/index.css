@@ -14,6 +14,10 @@ body,
   background-color: #f7fbff;
 }
 
+.login-ios-bounce-bg {
+  background-color: #4c9ffe;
+}
+
 @keyframes headerLabelSlideDown {
   from {
     transform: translateY(100%);
@@ -70,6 +74,102 @@ body,
 
 .login-overlay-content {
   animation: loginContentIn 260ms ease-out 180ms both;
+}
+
+@keyframes loginSpinnerSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loginCheckFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes loginSpinnerFillIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes loginSpinnerArcOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes loginCheckMarkIn {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes loginCircleOrbit {
+  0% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(0.35px, -0.45px);
+  }
+  40% {
+    transform: translate(0.65px, 0.1px);
+  }
+  60% {
+    transform: translate(0.2px, 0.55px);
+  }
+  80% {
+    transform: translate(-0.4px, 0.2px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+.login-spinner-spin {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: loginSpinnerSpin 0.9s linear infinite;
+}
+
+.login-check-icon {
+  animation: loginCheckFadeIn 380ms ease-out forwards;
+}
+
+.login-check-mark {
+  transform-origin: center;
+  animation: loginCheckMarkIn 420ms ease-out forwards;
+}
+
+.login-check-orbit {
+  transform-origin: center;
+  animation: loginCircleOrbit 1200ms ease-in-out infinite;
+}
+
+.login-spinner-fill-circle {
+  opacity: 0;
+  animation: loginSpinnerFillIn 450ms ease-out forwards;
+}
+
+.login-spinner-arc-fade {
+  animation: loginSpinnerSpin 0.9s linear infinite, loginSpinnerArcOut 450ms ease-out forwards;
 }
 
 /* Remove Autocomplete Background */
