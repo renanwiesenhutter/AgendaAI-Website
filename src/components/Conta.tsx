@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, UserRound } from 'lucide-react';
+import { Mail, Smartphone, UserRound } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 type UserData = {
@@ -17,9 +17,115 @@ export default function Conta() {
     whatsapp: '(45) 99145-3366'
   });
 
-  const [billingName, setBillingName] = React.useState(user.name);
-  const [billingEmail, setBillingEmail] = React.useState(user.email);
-  const [billingPhone, setBillingPhone] = React.useState('45 99145 3366');
+  const [billingName, setBillingName] = React.useState('');
+  const [billingEmail, setBillingEmail] = React.useState('');
+  const [billingPhone, setBillingPhone] = React.useState('');
+
+  const [touched, setTouched] = React.useState({
+    name: false,
+    email: false,
+    phone: false,
+  });
+
+  const [focused, setFocused] = React.useState({
+    name: false,
+    email: false,
+    phone: false,
+  });
+
+  const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+
+  const handlePhoneChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = event.target.value;
+
+    let digits = raw.replace(/\D/g, '');
+    const startsIntl = /^\s*(\+|00)/.test(raw);
+    if ((startsIntl || digits.length > 11) && digits.startsWith('55')) {
+      digits = digits.slice(2);
+    }
+
+    digits = digits.slice(0, 11);
+    const ddd = digits.slice(0, 2);
+    const rest = digits.slice(2);
+
+    let formatted = '';
+
+    if (digits.length <= 2) {
+      formatted = digits;
+    } else {
+      const prefix = `(${ddd}) `;
+
+      if (digits.length > 10) {
+        const p1 = rest.slice(0, 5);
+        const p2 = rest.slice(5, 9);
+        formatted = prefix + (p2 ? `${p1}-${p2}` : p1);
+      } else {
+        const p1 = rest.slice(0, 4);
+        const p2 = rest.slice(4, 8);
+        formatted = prefix + (p2 ? `${p1}-${p2}` : p1);
+      }
+    }
+
+    setBillingPhone(formatted);
+  }, []);
+
+  const validateName = (value: string) => {
+    const v = value.trim();
+    if (v.length === 0) return '';
+    if (v.length < 3) return 'Seu nome precisa de pelo menos três caracteres.';
+    if (v.length > 30) return 'Seu nome pode ter no máximo 30 caracteres.';
+    return '';
+  };
+
+  const validateEmail = (value: string) => {
+    const v = value.trim();
+    if (v.length === 0) return '';
+    if (!v.includes('@')) return 'Seu e-mail está incompleto.';
+    if (!gmailRegex.test(v)) return 'Lembre-se de usar um Gmail.';
+    return '';
+  };
+
+  const validatePhone = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length === 0) return '';
+    if (digits.length < 10) return 'Seu telefone está incompleto.';
+    return '';
+  };
+
+  const getNameError = () => {
+    if (!touched.name || focused.name) return '';
+    return validateName(billingName);
+  };
+
+  const getEmailError = () => {
+    if (!touched.email || focused.email) return '';
+    return validateEmail(billingEmail);
+  };
+
+  const getPhoneError = () => {
+    if (!touched.phone || focused.phone) return '';
+    return validatePhone(billingPhone);
+  };
+
+  const nameError = getNameError();
+  const emailError = getEmailError();
+  const phoneError = getPhoneError();
+  const groupError = nameError || emailError || phoneError;
+
+  const openBillingEditor = () => {
+    setBillingName(user.name);
+    setBillingEmail(user.email);
+    setBillingPhone(user.whatsapp);
+    setTouched({ name: false, email: false, phone: false });
+    setFocused({ name: false, email: false, phone: false });
+    setIsEditingBilling(true);
+  };
+
+  const closeBillingEditor = () => {
+    setIsEditingBilling(false);
+    setTouched({ name: false, email: false, phone: false });
+    setFocused({ name: false, email: false, phone: false });
+  };
 
   const handleSignOut = () => {
     navigate('/');
@@ -27,13 +133,26 @@ export default function Conta() {
 
   const handleSaveBilling = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    const submitNameError = validateName(billingName);
+    const submitEmailError = validateEmail(billingEmail);
+    const submitPhoneError = validatePhone(billingPhone);
+    const hasErrors = Boolean(submitNameError || submitEmailError || submitPhoneError);
+
+    if (hasErrors) {
+      setTouched({ name: true, email: true, phone: true });
+      setFocused({ name: false, email: false, phone: false });
+      return;
+    }
+
     setUser((prev) => ({
       ...prev,
       name: billingName.trim() || prev.name,
       email: billingEmail.trim() || prev.email,
-      whatsapp: billingPhone.trim() ? `(${billingPhone.slice(0, 2)}) ${billingPhone.slice(3)}` : prev.whatsapp
+      whatsapp: billingPhone.trim() || prev.whatsapp,
     }));
-    setIsEditingBilling(false);
+
+    closeBillingEditor();
   };
 
   return (
@@ -120,20 +239,14 @@ export default function Conta() {
                 </div>
 
                 <div className="flex items-center gap-3" style={{ paddingTop: '4px', paddingBottom: '2px' }}>
-                  <div className="w-[20px] h-[16px] flex items-center justify-center">
-                    <img
-                      src="https://js.stripe.com/v3/fingerprinted/img/FlagIcon-BR-36784f2b8710431a9b536b7224da0eba.svg"
-                      alt="Brasil"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
+                  <Smartphone className="h-5 w-5 text-[#9CA3AF]" strokeWidth={2.4} />
                   <span className="text-[16px] text-[#1F2937]">{user.whatsapp}</span>
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={() => setIsEditingBilling(true)}
+                  onClick={openBillingEditor}
                 className="mt-4 inline-flex items-center gap-2 text-[#3c4257] text-[16px] font-medium hover:text-[#2D3748] transition-colors"
               >
                 <svg viewBox="0 0 16 16" className="h-[12px] w-[12px]" fill="currentColor" aria-hidden="true">
@@ -166,13 +279,13 @@ export default function Conta() {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = 'https://billing.stripe.com/p/login/dRm4gy9hC2DGd8cgVA5ZC00';
-                }}
-                className="mt-10 w-full max-w-[380px] h-[50px] rounded-md border border-[#D1D5DB] bg-white text-[#374151] text-[16px] font-semibold hover:bg-[#F9FAFB] transition-colors"
-              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.open('https://billing.stripe.com/p/login/dRm4gy9hC2DGd8cgVA5ZC00', '_blank', 'noopener,noreferrer');
+                  }}
+                  className="mt-10 w-full max-w-[380px] h-[50px] rounded-md border border-[#D1D5DB] bg-white text-[#374151] text-[16px] font-semibold hover:bg-[#F9FAFB] transition-colors"
+                >
                 Gerenciar Assinatura
               </button>
             </>
@@ -181,7 +294,7 @@ export default function Conta() {
               <div className="text-[14px] text-[#4B5563] flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsEditingBilling(false)}
+                  onClick={closeBillingEditor}
                   className="font-semibold hover:text-[#111827] transition-colors"
                 >
                   Conta
@@ -198,42 +311,113 @@ export default function Conta() {
 
               <form className="mt-8" onSubmit={handleSaveBilling}>
                 <label className="block text-[14px] font-medium text-[#374151] mb-2">Nome</label>
-                <input
-                  value={billingName}
-                  onChange={(event) => setBillingName(event.target.value)}
-                  className="w-full h-[48px] rounded-md border border-[#CBD5E1] bg-white px-4 text-[16px] text-[#1F2937] outline-none focus:ring-2 focus:ring-[#4c9ffe]/20 focus:border-[#4c9ffe]"
-                />
-
-                <label className="block text-[14px] font-medium text-[#374151] mb-2 mt-7">Email</label>
-                <input
-                  type="email"
-                  value={billingEmail}
-                  onChange={(event) => setBillingEmail(event.target.value)}
-                  className="w-full h-[48px] rounded-md border border-[#CBD5E1] bg-white px-4 text-[16px] text-[#1F2937] outline-none focus:ring-2 focus:ring-[#4c9ffe]/20 focus:border-[#4c9ffe]"
-                />
-
-                <label className="block text-[14px] font-medium text-[#374151] mb-2 mt-7">Telefone</label>
-                <div className="h-[48px] rounded-md border border-[#CBD5E1] bg-white px-4 flex items-center gap-3">
-                  <span className="text-[#475569] font-medium">BR</span>
-                  <span className="text-[#94A3B8]">+55</span>
+                <div
+                  className={[
+                    'w-[350px] h-[48px] rounded-md border bg-white px-4 flex items-center gap-3 transition-colors',
+                    nameError ? 'border-red-300' : 'border-[#CBD5E1]',
+                    'focus-within:ring-2 focus-within:ring-[#4c9ffe]/20 focus-within:border-[#4c9ffe]',
+                  ].join(' ')}
+                >
+                  <UserRound className="h-4 w-4 text-gray-400" strokeWidth={2.4} />
                   <input
-                    value={billingPhone}
-                    onChange={(event) => setBillingPhone(event.target.value)}
-                    className="flex-1 bg-transparent text-[16px] text-[#1F2937] outline-none"
+                    type="text"
+                    value={billingName}
+                    maxLength={30}
+                    placeholder={user.name}
+                    onChange={(event) => setBillingName(event.target.value)}
+                    onFocus={() => setFocused((prev) => ({ ...prev, name: true }))}
+                    onBlur={() => {
+                      setFocused((prev) => ({ ...prev, name: false }));
+                      setTouched((prev) => ({ ...prev, name: true }));
+                    }}
+                    className={[
+                      'w-full bg-transparent text-[16px] outline-none',
+                      nameError
+                        ? 'text-red-700 placeholder-red-400 caret-red-600'
+                        : 'text-[#1F2937] placeholder:text-gray-400/80 caret-blue-600',
+                    ].join(' ')}
                   />
                 </div>
 
+                <label className="block text-[14px] font-medium text-[#374151] mb-2 mt-7">Email</label>
+                <div
+                  className={[
+                    'w-[350px] h-[48px] rounded-md border bg-white px-4 flex items-center gap-3 transition-colors',
+                    emailError ? 'border-red-300' : 'border-[#CBD5E1]',
+                    'focus-within:ring-2 focus-within:ring-[#4c9ffe]/20 focus-within:border-[#4c9ffe]',
+                  ].join(' ')}
+                >
+                  <Mail className="h-4 w-4 text-gray-400" strokeWidth={2.4} />
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    value={billingEmail}
+                    maxLength={50}
+                    placeholder={user.email}
+                    onChange={(event) => setBillingEmail(event.target.value)}
+                    onFocus={() => setFocused((prev) => ({ ...prev, email: true }))}
+                    onBlur={() => {
+                      setFocused((prev) => ({ ...prev, email: false }));
+                      setTouched((prev) => ({ ...prev, email: true }));
+                    }}
+                    className={[
+                      'w-full bg-transparent text-[16px] outline-none',
+                      emailError
+                        ? 'text-red-700 placeholder-red-400 caret-red-600'
+                        : 'text-[#1F2937] placeholder:text-gray-400/80 caret-blue-600',
+                    ].join(' ')}
+                  />
+                </div>
+
+                <label className="block text-[14px] font-medium text-[#374151] mb-2 mt-7">Telefone</label>
+                <div
+                  className={[
+                    'w-[350px] h-[48px] rounded-md border bg-white px-4 flex items-center gap-3 transition-colors',
+                    phoneError ? 'border-red-300' : 'border-[#CBD5E1]',
+                    'focus-within:ring-2 focus-within:ring-[#4c9ffe]/20 focus-within:border-[#4c9ffe]',
+                  ].join(' ')}
+                >
+                  <div className="w-[18px] h-[14px] flex items-center justify-center">
+                    <img
+                      src="https://js.stripe.com/v3/fingerprinted/img/FlagIcon-BR-36784f2b8710431a9b536b7224da0eba.svg"
+                      alt="Brasil"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={billingPhone}
+                    placeholder={user.whatsapp}
+                    onChange={handlePhoneChange}
+                    onFocus={() => setFocused((prev) => ({ ...prev, phone: true }))}
+                    onBlur={() => {
+                      setFocused((prev) => ({ ...prev, phone: false }));
+                      setTouched((prev) => ({ ...prev, phone: true }));
+                    }}
+                    className={[
+                      'w-full bg-transparent text-[16px] outline-none',
+                      phoneError
+                        ? 'text-red-700 placeholder-red-400 caret-red-600'
+                        : 'text-[#1F2937] placeholder:text-gray-400/80 caret-blue-600',
+                    ].join(' ')}
+                  />
+                </div>
+
+                {groupError ? <p className="mt-3 text-[14px] text-red-600">{groupError}</p> : null}
+
                 <button
                   type="submit"
-                  className="mt-10 w-full h-[48px] rounded-md bg-gradient-to-r from-blue-500 to-green-600 text-white text-[16px] font-semibold shadow-[0_10px_18px_-14px_rgba(99,91,255,0.35)] hover:opacity-95 transition-opacity"
+                  className="mt-10 w-[350px] h-[48px] rounded-md bg-gradient-to-r from-blue-500 to-green-600 text-white text-[16px] font-semibold shadow-[0_10px_18px_-14px_rgba(99,91,255,0.35)] hover:opacity-95 transition-opacity"
                 >
                   Salvar
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setIsEditingBilling(false)}
-                  className="mt-4 w-full h-[48px] rounded-md border border-[#D1D5DB] text-[#374151] text-[16px] font-semibold hover:bg-[#F9FAFB] transition-colors"
+                  onClick={closeBillingEditor}
+                  className="mt-4 w-[350px] h-[48px] rounded-md border border-[#D1D5DB] text-[#374151] text-[16px] font-semibold hover:bg-[#F9FAFB] transition-colors"
                 >
                   Cancelar
                 </button>
