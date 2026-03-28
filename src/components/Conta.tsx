@@ -2,6 +2,9 @@ import React from 'react';
 import { Mail, Smartphone, UserRound } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
+const TOKEN_KEY = 'agendaai_token';
+const AUTH_PHONE_KEY = 'agendaai_auth_phone';
+
 type UserData = {
   name: string;
   email: string;
@@ -11,6 +14,9 @@ type UserData = {
 export default function Conta() {
   const navigate = useNavigate();
   const [isEditingBilling, setIsEditingBilling] = React.useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = React.useState(false);
+  const [assetsReady, setAssetsReady] = React.useState(false);
+  const [bootVisible, setBootVisible] = React.useState(true);
   const [user, setUser] = React.useState<UserData>({
     name: 'Renan',
     email: 'email@gmail.com',
@@ -32,6 +38,95 @@ export default function Conta() {
     email: false,
     phone: false,
   });
+
+  React.useEffect(() => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      navigate('/login', { replace: true });
+    }
+  }, [navigate]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const waitForImage = (src: string, timeoutMs = 4000) =>
+      new Promise<void>((resolve) => {
+        const image = new Image();
+        const finish = () => {
+          window.clearTimeout(timeoutId);
+          resolve();
+        };
+        image.onload = finish;
+        image.onerror = finish;
+        image.src = src;
+
+        const timeoutId = window.setTimeout(resolve, timeoutMs);
+        if (image.complete) {
+          finish();
+        }
+      });
+
+    const waitForFonts = () => {
+      if (!('fonts' in document) || !document.fonts?.ready) {
+        return Promise.resolve();
+      }
+
+      return Promise.race([
+        document.fonts.ready.then(() => undefined).catch(() => undefined),
+        new Promise<void>((resolve) => window.setTimeout(resolve, 1500))
+      ]);
+    };
+
+    const waitForPaint = () =>
+      new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve());
+        });
+      });
+
+    const preloadSources = [
+      '/images/Logomarca.png',
+      'https://js.stripe.com/v3/fingerprinted/img/FlagIcon-BR-36784f2b8710431a9b536b7224da0eba.svg'
+    ];
+
+    Promise.all([...preloadSources.map((src) => waitForImage(src)), waitForFonts(), waitForPaint()]).then(() => {
+      if (cancelled) return;
+      setAssetsReady(true);
+    });
+
+    const hardTimeoutId = window.setTimeout(() => {
+      if (cancelled) return;
+      setAssetsReady(true);
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(hardTimeoutId);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!assetsReady) return;
+    const timeoutId = window.setTimeout(() => {
+      setBootVisible(false);
+    }, 80);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [assetsReady]);
+
+  React.useEffect(() => {
+    if (!showSignOutConfirm) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowSignOutConfirm(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showSignOutConfirm]);
 
   const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
 
@@ -128,7 +223,17 @@ export default function Conta() {
   };
 
   const handleSignOut = () => {
-    navigate('/');
+    setShowSignOutConfirm(true);
+  };
+
+  const cancelSignOut = () => {
+    setShowSignOutConfirm(false);
+  };
+
+  const confirmSignOut = () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(AUTH_PHONE_KEY);
+    navigate('/', { replace: true });
   };
 
   const handleSaveBilling = (event: React.FormEvent<HTMLFormElement>) => {
@@ -154,6 +259,56 @@ export default function Conta() {
 
     closeBillingEditor();
   };
+
+  if (bootVisible) {
+    return (
+      <main className="min-h-[100dvh] flex flex-col lg:flex-row bg-[#f7fbff]">
+        <aside className="w-full lg:w-[42%] bg-gradient-to-r from-blue-500 to-green-600 px-5 lg:px-10 pt-0 pb-0 min-h-[90px] lg:min-h-0 lg:pt-14 lg:pb-10">
+          <div className="mt-6 lg:mt-8">
+            <div className="account-skeleton-shimmer h-8 w-48 rounded-xl bg-white/25" />
+          </div>
+        </aside>
+
+        <section className="w-full lg:w-[58%] px-6 lg:px-10 py-10 lg:py-16">
+          <div className="w-full max-w-[520px] mx-auto lg:mx-0 lg:ml-14">
+            <div className="account-skeleton-shimmer h-10 w-52 rounded-2xl bg-[#e6e6e8]" />
+            <div className="account-skeleton-shimmer mt-4 h-5 w-[88%] rounded-xl bg-[#e6e6e8]" />
+
+            <div className="mt-7 space-y-3">
+              <div className="account-skeleton-shimmer h-6 w-[72%] rounded-xl bg-[#e6e6e8]" />
+              <div className="account-skeleton-shimmer h-6 w-[80%] rounded-xl bg-[#e6e6e8]" />
+              <div className="account-skeleton-shimmer h-6 w-[68%] rounded-xl bg-[#e6e6e8]" />
+            </div>
+
+            <div className="account-skeleton-shimmer mt-8 h-12 w-[240px] rounded-md bg-[#e6e6e8]" />
+            <div className="account-skeleton-shimmer mt-10 h-[50px] w-full max-w-[380px] rounded-md bg-[#e6e6e8]" />
+          </div>
+        </section>
+
+        <style>{`
+          .account-skeleton-shimmer {
+            position: relative;
+            overflow: hidden;
+          }
+
+          .account-skeleton-shimmer::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            transform: translateX(-100%);
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.42) 48%, rgba(255,255,255,0) 100%);
+            animation: account-skeleton-wave 1.2s ease-in-out infinite;
+          }
+
+          @keyframes account-skeleton-wave {
+            to {
+              transform: translateX(100%);
+            }
+          }
+        `}</style>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-[100dvh] flex flex-col lg:flex-row">
@@ -215,7 +370,7 @@ export default function Conta() {
         </div>
       </aside>
 
-      <section className="w-full lg:w-[58%] bg-[#f7fbff] lg:bg-white px-6 lg:px-10 py-10 lg:py-16 flex-1 min-h-0 flex flex-col">
+      <section className="account-page-enter w-full lg:w-[58%] bg-[#f7fbff] lg:bg-white px-6 lg:px-10 py-10 lg:py-16 flex-1 min-h-0 flex flex-col">
         <div className="w-full max-w-[520px] mx-auto lg:mx-0 lg:ml-14 lg:flex-1">
           {!isEditingBilling ? (
             <>
@@ -446,6 +601,40 @@ export default function Conta() {
         </div>
 
         <style>{`
+          .signout-modal-enter {
+            animation: signout-modal-enter 260ms cubic-bezier(0.22, 1, 0.36, 1);
+            will-change: transform, opacity;
+          }
+
+          @keyframes signout-modal-enter {
+            from {
+              opacity: 0;
+              transform: translateY(8px) scale(0.98);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+
+          .account-page-enter {
+            animation: account-page-enter 520ms cubic-bezier(0.22, 1, 0.36, 1);
+            will-change: transform, opacity;
+          }
+
+          @keyframes account-page-enter {
+            from {
+              opacity: 0;
+              transform: translateY(14px);
+              filter: blur(1.5px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+              filter: blur(0);
+            }
+          }
+
           .account-step-enter {
             animation: account-step-enter 560ms cubic-bezier(0.22, 1, 0.36, 1);
             will-change: transform, opacity;
@@ -482,12 +671,61 @@ export default function Conta() {
           }
 
           @media (prefers-reduced-motion: reduce) {
+            .signout-modal-enter {
+              animation: none;
+            }
+
+            .account-page-enter {
+              animation: none;
+            }
+
             .account-step-enter {
               animation: none;
             }
           }
         `}</style>
       </section>
+
+      {showSignOutConfirm && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-[#0f172a]/45 px-5 backdrop-blur-[1.5px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="signout-confirm-title"
+          onClick={cancelSignOut}
+        >
+          <div
+            className="signout-modal-enter w-full max-w-[430px] rounded-md border border-white/70 bg-white p-6 shadow-[0_28px_65px_-34px_rgba(15,23,42,0.55)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="signout-confirm-title" className="text-[24px] font-semibold leading-tight text-[#1A1A1AE6]">
+              Sair da conta?
+            </h2>
+
+            <p className="mt-2 text-[15px] leading-relaxed text-[#1A1A1AB2]">
+              Você vai encerrar sua sessão neste dispositivo. Para voltar, será necessário fazer login novamente.
+            </p>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={cancelSignOut}
+                className="h-[44px] rounded-md border border-[#D1D5DB] px-5 text-[15px] font-semibold text-[#374151] transition-colors hover:bg-[#F9FAFB]"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmSignOut}
+                className="h-[44px] rounded-md bg-gradient-to-r from-blue-500 to-green-600 px-5 text-[15px] font-semibold text-white shadow-[0_10px_18px_-14px_rgba(99,91,255,0.35)] transition-opacity hover:opacity-95"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

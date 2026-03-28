@@ -1,36 +1,154 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+type AuthApiResponse = {
+  success?: boolean;
+  authorized?: boolean;
+  token?: string;
+  message?: string;
+  error?: string;
+  attemptsRemaining?: number;
+  blockedUntil?: string | number | null;
+  codeExpired?: boolean;
+  retryAfterSeconds?: number;
+};
+
+const SEND_CODE_ENDPOINT = 'https://n8n.dalzzen.com/webhook/auth/send-code';
+const VERIFY_CODE_ENDPOINT = 'https://n8n.dalzzen.com/webhook/auth/verify-code';
+const AUTH_PHONE_KEY = 'agendaai_auth_phone';
+const TOKEN_KEY = 'agendaai_token';
+
+const getDigits = (value: string) => value.replace(/\D/g, '');
+
+const formatPhone = (value: string) => {
+  const digits = getDigits(value).slice(0, 11);
+  if (!digits) return '';
+  if (digits.length <= 2) return digits;
+
+  const ddd = digits.slice(0, 2);
+  const rest = digits.slice(2);
+
+  if (digits.length > 10) {
+    const part1 = rest.slice(0, 5);
+    const part2 = rest.slice(5, 9);
+    return `(${ddd}) ${part1}${part2 ? `-${part2}` : ''}`;
+  }
+
+  const part1 = rest.slice(0, 4);
+  const part2 = rest.slice(4, 8);
+  return `(${ddd}) ${part1}${part2 ? `-${part2}` : ''}`;
+};
+
+const parseBlockedUntil = (value: AuthApiResponse['blockedUntil']) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value > 1_000_000_000_000 ? value : value * 1000;
+  }
+
+  if (typeof value === 'string') {
+    const numericValue = Number(value);
+    if (Number.isFinite(numericValue)) {
+      return numericValue > 1_000_000_000_000 ? numericValue : numericValue * 1000;
+    }
+
+    const parsedDate = Date.parse(value);
+    if (!Number.isNaN(parsedDate)) {
+      return parsedDate;
+    }
+  }
+
+  return null;
+};
+
+const formatDuration = (seconds: number) => {
+  const safeSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+};
+
+const getApiMessage = (payload: AuthApiResponse | null, fallback: string) => {
+  if (payload?.message && payload.message.trim()) return payload.message;
+  if (payload?.error && payload.error.trim()) return payload.error;
+  return fallback;
+};
+
+async function postAuth(url: string, body: Record<string, string>) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  let payload: AuthApiResponse | null = null;
+  try {
+    payload = (await response.json()) as AuthApiResponse;
+  } catch {
+    payload = null;
+  }
+
+  return { response, payload };
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const [phone, setPhone] = React.useState('');
   const [phoneTouched, setPhoneTouched] = React.useState(false);
   const [phoneFocused, setPhoneFocused] = React.useState(false);
   const [phoneSubmitAttempted, setPhoneSubmitAttempted] = React.useState(false);
+  const [phoneApiError, setPhoneApiError] = React.useState('');
   const [step, setStep] = React.useState<'phone' | 'confirmation'>('phone');
+  const [authPhone, setAuthPhone] = React.useState('');
   const [code, setCode] = React.useState(['', '', '', '', '', '']);
-  const [error, setError] = React.useState('');
+  const [codeError, setCodeError] = React.useState('');
+  const [codeExpired, setCodeExpired] = React.useState(false);
   const [confirmPhase, setConfirmPhase] = React.useState<'idle' | 'verifying' | 'moving' | 'checking' | 'success'>('idle');
   const [loaderShiftPx, setLoaderShiftPx] = React.useState(150);
+  const [blockedUntilMs, setBlockedUntilMs] = React.useState<number | null>(null);
+  const [blockedSecondsLeft, setBlockedSecondsLeft] = React.useState(0);
+  const [resendCooldownSeconds, setResendCooldownSeconds] = React.useState(0);
+  const [sendingCode, setSendingCode] = React.useState(false);
+  const [verifyingCode, setVerifyingCode] = React.useState(false);
+  const [resendingCode, setResendingCode] = React.useState(false);
   const [assetsReady, setAssetsReady] = React.useState(false);
   const [bootVisible, setBootVisible] = React.useState(true);
   const codeInputRefs = React.useRef<Array<HTMLInputElement | null>>([]);
   const confirmButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const timersRef = React.useRef<number[]>([]);
 
-  const digitsOnly = phone.replace(/\D/g, '');
+  const digitsOnly = getDigits(phone);
   const phoneValid = digitsOnly.length >= 10;
-  const phoneError =
+  const phoneValidationError =
     !phoneFocused && (phoneTouched || phoneSubmitAttempted) && digitsOnly.length > 0 && !phoneValid
       ? 'Seu telefone está incompleto.'
       : '';
-  const phonePreview =
-    digitsOnly.length >= 10
-      ? `(${digitsOnly.slice(0, 2)}) ${digitsOnly.slice(2, digitsOnly.length > 10 ? 7 : 6)}-${digitsOnly.slice(
-          digitsOnly.length > 10 ? 7 : 6,
-          11
-        )}`
-      : phone;
+  const phoneError = phoneApiError || phoneValidationError;
+  const phonePreview = formatPhone(authPhone || digitsOnly);
+
+  const blockActive = blockedSecondsLeft > 0;
+  const resendBlockedByCooldown = resendCooldownSeconds > 0;
+  const phoneSubmitDisabled = sendingCode || !phoneValid;
+  const confirmSubmitDisabled = verifyingCode || resendingCode || blockActive;
+  const resendDisabled = verifyingCode || resendingCode || blockActive || resendBlockedByCooldown;
+  const isConfirmAnimating = confirmPhase !== 'idle';
+
+  const clearQueuedTimers = React.useCallback(() => {
+    timersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    timersRef.current = [];
+  }, []);
+
+  const queueTimeout = React.useCallback((callback: () => void, delay: number) => {
+    const timeoutId = window.setTimeout(callback, delay);
+    timersRef.current.push(timeoutId);
+  }, []);
+
+  const updateLoaderShift = React.useCallback(() => {
+    const buttonWidth = confirmButtonRef.current?.offsetWidth;
+    if (!buttonWidth) return;
+    const distance = Math.max(0, buttonWidth / 2 - 32);
+    setLoaderShiftPx(distance);
+  }, []);
 
   React.useEffect(() => {
     if (step !== 'confirmation') return;
@@ -48,11 +166,27 @@ export default function Login() {
   }, [step]);
 
   React.useEffect(() => {
-    return () => {
-      timersRef.current.forEach((timerId) => window.clearTimeout(timerId));
-      timersRef.current = [];
-    };
+    const existingToken = localStorage.getItem(TOKEN_KEY);
+    if (existingToken) {
+      navigate('/conta', { replace: true });
+    }
+  }, [navigate]);
+
+  React.useEffect(() => {
+    const persistedPhone = localStorage.getItem(AUTH_PHONE_KEY) ?? '';
+    const persistedDigits = getDigits(persistedPhone).slice(0, 11);
+    if (persistedDigits.length >= 10) {
+      setAuthPhone(persistedDigits);
+      setPhone(formatPhone(persistedDigits));
+      setStep('confirmation');
+    }
   }, []);
+
+  React.useEffect(() => {
+    return () => {
+      clearQueuedTimers();
+    };
+  }, [clearQueuedTimers]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -86,94 +220,215 @@ export default function Login() {
     return () => window.clearTimeout(timeoutId);
   }, [assetsReady]);
 
-  const queueTimeout = (callback: () => void, delay: number) => {
-    const timeoutId = window.setTimeout(callback, delay);
-    timersRef.current.push(timeoutId);
-  };
+  React.useEffect(() => {
+    if (!blockedUntilMs) {
+      setBlockedSecondsLeft(0);
+      return;
+    }
 
-  const updateLoaderShift = React.useCallback(() => {
-    const buttonWidth = confirmButtonRef.current?.offsetWidth;
-    if (!buttonWidth) return;
+    const updateRemaining = () => {
+      const remaining = Math.max(0, Math.ceil((blockedUntilMs - Date.now()) / 1000));
+      setBlockedSecondsLeft(remaining);
+    };
 
-    const distance = Math.max(0, buttonWidth / 2 - 32);
-    setLoaderShiftPx(distance);
-  }, []);
+    updateRemaining();
+    if (blockedUntilMs <= Date.now()) return;
+
+    const intervalId = window.setInterval(updateRemaining, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [blockedUntilMs]);
+
+  React.useEffect(() => {
+    if (resendCooldownSeconds <= 0) return;
+
+    const intervalId = window.setInterval(() => {
+      setResendCooldownSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [resendCooldownSeconds]);
 
   React.useEffect(() => {
     if (step !== 'confirmation') return;
-
     updateLoaderShift();
     window.addEventListener('resize', updateLoaderShift);
     return () => window.removeEventListener('resize', updateLoaderShift);
   }, [step, updateLoaderShift]);
 
-  const startVerification = (currentCode: string[]) => {
-    if (confirmPhase !== 'idle') {
-      return;
+  const applyAuthHints = React.useCallback((payload: AuthApiResponse | null) => {
+    if (!payload) return;
+
+    const nextBlockedUntil = parseBlockedUntil(payload.blockedUntil);
+    if (nextBlockedUntil) {
+      setBlockedUntilMs(nextBlockedUntil);
+    } else if ('blockedUntil' in payload && !payload.blockedUntil) {
+      setBlockedUntilMs(null);
     }
 
-    if (currentCode.some((digit) => !digit)) {
-      setError('Código de verificação incorreto.');
-      return;
+    if (typeof payload.retryAfterSeconds === 'number') {
+      setResendCooldownSeconds(Math.max(0, Math.ceil(payload.retryAfterSeconds)));
     }
 
-    if (currentCode.join('') !== '123456') {
-      setError('Código de verificação incorreto.');
-      return;
+    if (typeof payload.codeExpired === 'boolean') {
+      setCodeExpired(payload.codeExpired);
     }
+  }, []);
 
-    updateLoaderShift();
-    setError('');
-    setConfirmPhase('verifying');
+  const sendCodeRequest = React.useCallback(
+    async (phoneNumber: string, fromResend: boolean) => {
+      if (fromResend) {
+        setResendingCode(true);
+      } else {
+        setSendingCode(true);
+      }
 
-    queueTimeout(() => {
-      setConfirmPhase('moving');
-    }, 700);
+      setPhoneApiError('');
+      setCodeError('');
 
-    queueTimeout(() => {
-      setConfirmPhase('checking');
-    }, 1500);
+      try {
+        const { response, payload } = await postAuth(SEND_CODE_ENDPOINT, { phone: phoneNumber });
+        applyAuthHints(payload);
 
-    queueTimeout(() => {
-      setConfirmPhase('success');
-    }, 1850);
+        if (response.ok && payload?.success) {
+          localStorage.setItem(AUTH_PHONE_KEY, phoneNumber);
+          setAuthPhone(phoneNumber);
+          setStep('confirmation');
+          setCodeExpired(false);
+          setCode(['', '', '', '', '', '']);
 
-    queueTimeout(() => {
-      navigate('/conta');
-    }, 2850);
-  };
+          return;
+        }
+
+        const message = getApiMessage(payload, 'Não foi possível enviar o código agora. Tente novamente.');
+        if (fromResend || step === 'confirmation') {
+          setCodeError(message);
+        } else {
+          setPhoneApiError(message);
+        }
+      } catch {
+        const message = 'Erro de conexão. Verifique sua internet e tente novamente.';
+        if (fromResend || step === 'confirmation') {
+          setCodeError(message);
+        } else {
+          setPhoneApiError(message);
+        }
+      } finally {
+        if (fromResend) {
+          setResendingCode(false);
+        } else {
+          setSendingCode(false);
+        }
+      }
+    },
+    [applyAuthHints, step]
+  );
+
+  const startVerification = React.useCallback(
+    async (currentCode: string[]) => {
+      if (verifyingCode || resendingCode) return;
+
+      if (blockActive) {
+        setCodeError(`Muitas tentativas. Tente novamente em ${formatDuration(blockedSecondsLeft)}.`);
+        return;
+      }
+
+      if (currentCode.some((digit) => !digit)) {
+        setCodeError('Digite os 6 dígitos para continuar.');
+        return;
+      }
+
+      if (!authPhone) {
+        setCodeError('Número não encontrado. Volte e solicite um novo código.');
+        return;
+      }
+
+      setVerifyingCode(true);
+      clearQueuedTimers();
+      setConfirmPhase('verifying');
+      setCodeError('');
+      const verificationStartedAt = performance.now();
+
+      let verificationSucceeded = false;
+
+      try {
+        const { response, payload } = await postAuth(VERIFY_CODE_ENDPOINT, {
+          phone: authPhone,
+          code: currentCode.join('')
+        });
+
+        applyAuthHints(payload);
+
+        if (response.ok && payload?.success && payload.authorized && payload.token) {
+          verificationSucceeded = true;
+          localStorage.setItem(TOKEN_KEY, payload.token);
+          localStorage.removeItem(AUTH_PHONE_KEY);
+
+          const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          const elapsedSinceVerifying = performance.now() - verificationStartedAt;
+          const minimumVerifyingMs = prefersReducedMotion ? 280 : 900;
+          const remainingVerifyingMs = Math.max(0, minimumVerifyingMs - elapsedSinceVerifying);
+
+          if (remainingVerifyingMs > 0) {
+            await new Promise<void>((resolve) => {
+              window.setTimeout(resolve, remainingVerifyingMs);
+            });
+          }
+
+          if (prefersReducedMotion) {
+            setConfirmPhase('success');
+            queueTimeout(() => {
+              navigate('/conta');
+            }, 1080);
+            return;
+          }
+
+          setConfirmPhase('moving');
+          queueTimeout(() => setConfirmPhase('checking'), 900);
+          queueTimeout(() => setConfirmPhase('success'), 1500);
+          queueTimeout(() => {
+            navigate('/conta');
+          }, 2500);
+          return;
+        }
+
+        const message = getApiMessage(payload, 'Código inválido. Revise e tente novamente.');
+        setCodeError(message);
+      } catch {
+        setCodeError('Erro de conexão. Verifique sua internet e tente novamente.');
+      } finally {
+        if (!verificationSucceeded) {
+          setVerifyingCode(false);
+          setConfirmPhase('idle');
+        }
+      }
+    },
+    [
+      applyAuthHints,
+      authPhone,
+      blockActive,
+      blockedSecondsLeft,
+      clearQueuedTimers,
+      navigate,
+      queueTimeout,
+      resendingCode,
+      verifyingCode
+    ]
+  );
 
   const handlePhoneChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    let digits = event.target.value.replace(/\D/g, '');
+    let digits = getDigits(event.target.value);
     setPhoneSubmitAttempted(false);
+    setPhoneApiError('');
 
     if (digits.length > 11 && digits.startsWith('55')) {
       digits = digits.slice(2);
     }
 
     digits = digits.slice(0, 11);
-
-    if (digits.length <= 2) {
-      setPhone(digits);
-      return;
-    }
-
-    const ddd = digits.slice(0, 2);
-    const rest = digits.slice(2);
-
-    if (digits.length > 10) {
-      const part1 = rest.slice(0, 5);
-      const part2 = rest.slice(5, 9);
-      setPhone(`(${ddd}) ${part1}${part2 ? `-${part2}` : ''}`);
-      return;
-    }
-
-    const part1 = rest.slice(0, 4);
-    const part2 = rest.slice(4, 8);
-    setPhone(`(${ddd}) ${part1}${part2 ? `-${part2}` : ''}`);
+    setPhone(formatPhone(digits));
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!phoneValid) {
@@ -182,9 +437,7 @@ export default function Login() {
       return;
     }
 
-    setError('');
-    setCode(['', '', '', '', '', '']);
-    setStep('confirmation');
+    await sendCodeRequest(digitsOnly, false);
   };
 
   const handleCodeChange = (value: string, index: number) => {
@@ -192,20 +445,32 @@ export default function Login() {
     const nextCode = [...code];
     nextCode[index] = nextValue;
     setCode(nextCode);
-    setError('');
+    setCodeError('');
 
     if (nextValue && index < codeInputRefs.current.length - 1) {
       codeInputRefs.current[index + 1]?.focus();
     }
 
     if (nextCode.every((digit) => digit) && index === 5) {
-      startVerification(nextCode);
+      void startVerification(nextCode);
     }
   };
 
   const handleCodeKeyDown = (event: React.KeyboardEvent<HTMLInputElement>, index: number) => {
     if (event.key === 'Backspace' && !code[index] && index > 0) {
       codeInputRefs.current[index - 1]?.focus();
+      return;
+    }
+
+    if (event.key === 'ArrowLeft' && index > 0) {
+      event.preventDefault();
+      codeInputRefs.current[index - 1]?.focus();
+      return;
+    }
+
+    if (event.key === 'ArrowRight' && index < codeInputRefs.current.length - 1) {
+      event.preventDefault();
+      codeInputRefs.current[index + 1]?.focus();
     }
   };
 
@@ -223,22 +488,20 @@ export default function Login() {
     });
 
     setCode(nextCode);
-    setError('');
+    setCodeError('');
 
     const focusIndex = Math.min(pastedDigits.length, 5);
     codeInputRefs.current[focusIndex]?.focus();
 
     if (pastedDigits.length === 6) {
-      startVerification(nextCode);
+      void startVerification(nextCode);
     }
   };
 
-  const handleConfirmSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleConfirmSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    startVerification(code);
+    await startVerification(code);
   };
-
-  const isConfirmBusy = confirmPhase !== 'idle';
 
   const handleGoBack = React.useCallback(() => {
     if (window.history.length > 1) {
@@ -409,15 +672,15 @@ export default function Login() {
 
                 <div
                   className="overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                  style={{
-                    maxHeight: phoneError ? '44px' : '0px',
-                    opacity: phoneError ? 0.88 : 0,
-                    transform: phoneError ? 'translateY(0)' : 'translateY(-10px)',
-                    marginTop: phoneError ? '12px' : '0px',
-                    marginBottom: phoneError ? '8px' : '0px'
-                  }}
-                  aria-live="polite"
-                >
+                    style={{
+                      maxHeight: phoneError ? '44px' : '0px',
+                      opacity: phoneError ? 0.88 : 0,
+                      transform: phoneError ? 'translateY(0)' : 'translateY(-10px)',
+                      marginTop: phoneError ? '12px' : '0px',
+                      marginBottom: phoneError ? '8px' : '0px'
+                    }}
+                    aria-live="polite"
+                  >
                   <div className="flex items-center gap-2">
                     <svg
                       viewBox="0 0 24 24"
@@ -440,13 +703,14 @@ export default function Login() {
 
                 <button
                   type="submit"
+                  disabled={phoneSubmitDisabled}
                   className={`mt-5 w-full h-[44px] rounded-md text-white text-[16px] font-medium transition-all ${
-                    phoneValid
+                    phoneValid && !sendingCode
                       ? 'bg-gradient-to-r from-blue-500 to-green-600 opacity-100 shadow-[0_10px_18px_-14px_rgba(99,91,255,0.35)]'
                       : 'bg-gradient-to-r from-blue-500 to-green-600 opacity-55 shadow-none'
                   }`}
                 >
-                  Enviar
+                  {sendingCode ? 'Enviando...' : 'Enviar'}
                 </button>
 
                 <div className="mt-4 text-center">
@@ -490,7 +754,7 @@ export default function Login() {
                             onChange={(event) => handleCodeChange(event.target.value, index)}
                             onKeyDown={(event) => handleCodeKeyDown(event, index)}
                             onPaste={handleCodePaste}
-                            disabled={isConfirmBusy}
+                            disabled={verifyingCode || resendingCode || blockActive}
                             className={`relative h-[52px] w-[44px] border border-gray-300 bg-white text-center text-[24px] font-medium text-gray-900 outline-none transition focus:z-10 focus:border-[#4c9ffe] focus:ring-2 focus:ring-[#4c9ffe]/20 ${
                               isFirstInGroup ? 'rounded-l-md' : isLastInGroup ? 'rounded-r-md -ml-px' : 'rounded-none -ml-px'
                             }`}
@@ -503,13 +767,13 @@ export default function Login() {
                 </div>
 
                 <div
-                  className="overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  className="overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
                   style={{
-                    maxHeight: error ? '44px' : '0px',
-                    opacity: error ? 0.88 : 0,
-                    transform: error ? 'translateY(0)' : 'translateY(-10px)',
-                    marginTop: error ? '20px' : '0px',
-                    marginBottom: error ? '4px' : '0px'
+                    maxHeight: codeError ? '24px' : '0px',
+                    opacity: codeError ? 0.9 : 0,
+                    transform: codeError ? 'translateY(0)' : 'translateY(-6px)',
+                    marginTop: codeError ? '6px' : '0px',
+                    marginBottom: codeError ? '2px' : '0px'
                   }}
                   aria-live="polite"
                 >
@@ -529,16 +793,26 @@ export default function Login() {
                         strokeLinejoin="round"
                       />
                     </svg>
-                    <p className="text-[14px] text-[#d64b6f]">{error}</p>
+                    <p className="text-[14px] text-[#d64b6f]">{codeError}</p>
                   </div>
+                </div>
+
+                <div className="mt-3 min-h-[24px] text-center" aria-live="polite">
+                  {blockActive && (
+                    <p className="text-[14px] text-[#d64b6f]">
+                      Temporariamente bloqueado. Tente novamente em {formatDuration(blockedSecondsLeft)}.
+                    </p>
+                  )}
                 </div>
 
                 <button
                   ref={confirmButtonRef}
                   type="submit"
-                  disabled={isConfirmBusy}
-                  className={`relative mt-5 w-full h-[44px] rounded-md text-white text-[16px] font-medium disabled:cursor-default bg-[#4c9ffe] ${
-                    isConfirmBusy ? 'shadow-none' : 'shadow-[0_10px_18px_-14px_rgba(99,91,255,0.35)]'
+                  disabled={confirmSubmitDisabled}
+                  className={`relative mt-5 w-full h-[44px] rounded-md text-white text-[16px] font-medium bg-[#4c9ffe] disabled:cursor-default ${
+                    confirmSubmitDisabled && !isConfirmAnimating ? 'opacity-70' : 'opacity-100'
+                  } ${
+                    verifyingCode ? 'shadow-none' : 'shadow-[0_10px_18px_-14px_rgba(99,91,255,0.35)]'
                   }`}
                   style={{
                     transform: 'translateZ(0)',
@@ -551,14 +825,12 @@ export default function Login() {
                       opacity: confirmPhase === 'moving' || confirmPhase === 'checking' || confirmPhase === 'success' ? 1 : 0,
                       transition:
                         confirmPhase === 'moving' || confirmPhase === 'checking' || confirmPhase === 'success'
-                          ? 'opacity 4000ms cubic-bezier(0.22, 1, 0.36, 1)'
+                          ? 'opacity 760ms cubic-bezier(0.22, 1, 0.36, 1)'
                           : 'opacity 220ms ease'
                     }}
                   />
 
-                  <span
-                    className={`relative z-[1] transition-opacity duration-250 ${confirmPhase === 'idle' ? 'opacity-100' : 'opacity-0'}`}
-                  >
+                  <span className={`relative z-[1] transition-opacity duration-250 ${isConfirmAnimating ? 'opacity-0' : 'opacity-100'}`}>
                     Continuar
                   </span>
 
@@ -577,14 +849,14 @@ export default function Login() {
                     Validando...
                   </span>
 
-                  {confirmPhase !== 'idle' && (
+                  {isConfirmAnimating && (
                     <span
                       className="pointer-events-none absolute top-1/2 right-[21px] h-[22px] w-[22px] will-change-transform"
                       style={{
                         transform: `translate3d(${confirmPhase === 'verifying' ? '0px' : `-${loaderShiftPx}px`}, -50%, 0)`,
                         transition:
                           confirmPhase === 'moving'
-                            ? 'transform 720ms cubic-bezier(0.65, 0, 1, 1)'
+                            ? 'transform 980ms cubic-bezier(0.65, 0, 1, 1)'
                             : 'transform 180ms ease'
                       }}
                     >
@@ -597,6 +869,7 @@ export default function Login() {
                             strokeWidth="1.7"
                             strokeLinecap="round"
                             strokeLinejoin="round"
+                            className="login-check-path-1"
                           />
                           <path
                             d="M10.3 15.5L16.8 9"
@@ -604,6 +877,7 @@ export default function Login() {
                             strokeWidth="1.7"
                             strokeLinecap="round"
                             strokeLinejoin="round"
+                            className="login-check-path-2"
                           />
                         </svg>
                       ) : (
@@ -625,16 +899,28 @@ export default function Login() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    if (isConfirmBusy) return;
-                    setError('');
+                  onClick={async () => {
+                    if (resendDisabled || !authPhone) return;
                     setCode(['', '', '', '', '', '']);
+                    await sendCodeRequest(authPhone, true);
                   }}
-                  disabled={isConfirmBusy}
-                  className="mt-6 w-full text-center text-[16px] text-blue-600 hover:text-blue-700 transition-colors disabled:opacity-60 disabled:cursor-default"
+                  disabled={resendDisabled || !authPhone}
+                  className={`mt-6 w-full text-center text-[16px] transition-colors disabled:opacity-60 disabled:cursor-default ${
+                    codeExpired ? 'text-[#d64b6f] font-semibold hover:text-[#c0385f]' : 'text-blue-600 hover:text-blue-700'
+                  }`}
                 >
-                  Reenviar Código
+                  {resendingCode
+                    ? 'Reenviando...'
+                    : resendBlockedByCooldown
+                      ? `Reenviar código em ${formatDuration(resendCooldownSeconds)}`
+                      : 'Reenviar Código'}
                 </button>
+
+                {codeExpired && (
+                  <p className="mt-2 text-center text-[14px] text-[#d64b6f]" aria-live="polite">
+                    O código expirou. Solicite um novo código para continuar.
+                  </p>
+                )}
               </form>
             </div>
           )}
@@ -694,12 +980,75 @@ export default function Login() {
             }
           }
 
+          .login-spinner-spin {
+            animation: login-spinner-rotate 780ms linear infinite;
+            transform-origin: center;
+          }
+
+          .login-check-icon {
+            animation: login-check-pop 260ms cubic-bezier(0.16, 1, 0.3, 1);
+          }
+
+          .login-check-orbit {
+            stroke-dasharray: 57;
+            stroke-dashoffset: 57;
+            animation: login-check-orbit 360ms ease-out forwards;
+          }
+
+          .login-check-path-1,
+          .login-check-path-2 {
+            stroke-dasharray: 16;
+            stroke-dashoffset: 16;
+            animation: login-check-stroke 240ms ease-out forwards;
+          }
+
+          .login-check-path-2 {
+            animation-delay: 80ms;
+          }
+
+          @keyframes login-spinner-rotate {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+
+          @keyframes login-check-pop {
+            from {
+              opacity: 0;
+              transform: scale(0.78);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+
+          @keyframes login-check-orbit {
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+
+          @keyframes login-check-stroke {
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+
           @media (prefers-reduced-motion: reduce) {
             .login-step-enter {
               animation: none;
             }
 
             .login-step-enter > * {
+              animation: none;
+            }
+
+            .login-spinner-spin,
+            .login-check-icon,
+            .login-check-orbit,
+            .login-check-path-1,
+            .login-check-path-2 {
               animation: none;
             }
           }

@@ -3,6 +3,8 @@ import { SiYoutube, SiWhatsapp, SiInstagram } from "react-icons/si";
 import { Calendar, MessageCircle, CheckCircle, Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, ChevronLeft, ChevronRight, ChevronDown, X, Menu } from 'lucide-react';
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+const TOKEN_KEY = 'agendaai_token';
+
 const HEADER_SECTIONS = [
   { id: 'top', label: 'Início', width: 44 },
   { id: 'como-funciona', label: 'Como Usar', width: 102 },
@@ -273,6 +275,10 @@ function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentSectionLabel, setCurrentSectionLabel] = useState('Início');
   const [sectionLabelWidth, setSectionLabelWidth] = useState<number>(HEADER_SECTIONS[0].width);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(localStorage.getItem(TOKEN_KEY));
+  });
   const videoRef = useRef<HTMLVideoElement>(null);
   const scrollLockY = useRef(0);
   const headerRef = useRef<HTMLElement>(null);
@@ -293,6 +299,25 @@ function Home() {
   const HEADER_OFFSET = 0; // ajuste conforme a altura real do seu header
   const location = useLocation();
   const navigate = useNavigate();
+  const accountLinkPath = isAuthenticated ? '/conta' : '/login';
+  const accountLinkLabel = isAuthenticated ? 'Perfil' : 'Login';
+
+  useEffect(() => {
+    const syncAuthState = () => {
+      setIsAuthenticated(Boolean(localStorage.getItem(TOKEN_KEY)));
+    };
+
+    syncAuthState();
+    window.addEventListener('storage', syncAuthState);
+    window.addEventListener('focus', syncAuthState);
+    document.addEventListener('visibilitychange', syncAuthState);
+
+    return () => {
+      window.removeEventListener('storage', syncAuthState);
+      window.removeEventListener('focus', syncAuthState);
+      document.removeEventListener('visibilitychange', syncAuthState);
+    };
+  }, []);
 
   const smoothScrollTo = React.useCallback((targetTop: number) => {
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -955,14 +980,14 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
 
             <Link
               ref={loginPillRef}
-              to="/login"
+              to={accountLinkPath}
               className="relative isolate inline-flex h-8 items-center justify-center overflow-hidden rounded-full px-4 text-sm font-medium text-slate-800 border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.56)_0%,rgba(255,255,255,0.18)_100%)] backdrop-blur-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.98),inset_0_-1px_0_rgba(255,255,255,0.45),0_8px_18px_-12px_rgba(15,23,42,0.42)] ring-1 ring-white/55 transition-[background-color,color,box-shadow] duration-300"
             >
               <span ref={loginSheenRef} className="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(100%_70%_at_15%_0%,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0)_72%)] transition-[transform,opacity] duration-500 ease-out" />
               <span ref={loginBlobLeftRef} className="pointer-events-none absolute -left-4 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full bg-cyan-300/45 blur-md transition-[transform,opacity] duration-500 ease-out" />
               <span ref={loginBlobRightRef} className="pointer-events-none absolute -right-3 top-1 h-6 w-6 rounded-full bg-fuchsia-300/35 blur-md transition-[transform,opacity] duration-500 ease-out" />
               <span ref={loginInnerBorderRef} className="pointer-events-none absolute inset-[1px] rounded-full border border-white/35 transition-opacity duration-300" />
-              <span className="relative z-10">Login</span>
+              <span className="relative z-10">{accountLinkLabel}</span>
             </Link>
           </div>
         </div>
