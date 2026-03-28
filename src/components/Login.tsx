@@ -17,6 +17,7 @@ const SEND_CODE_ENDPOINT = 'https://n8n.dalzzen.com/webhook/auth/send-code';
 const VERIFY_CODE_ENDPOINT = 'https://n8n.dalzzen.com/webhook/auth/verify-code';
 const AUTH_PHONE_KEY = 'agendaai_auth_phone';
 const TOKEN_KEY = 'agendaai_token';
+const ACCOUNT_PHONE_KEY = 'agendaai_user_phone';
 
 const getDigits = (value: string) => value.replace(/\D/g, '');
 
@@ -361,6 +362,7 @@ export default function Login() {
         if (response.ok && payload?.success && payload.authorized && payload.token) {
           verificationSucceeded = true;
           localStorage.setItem(TOKEN_KEY, payload.token);
+          localStorage.setItem(ACCOUNT_PHONE_KEY, authPhone);
           localStorage.removeItem(AUTH_PHONE_KEY);
 
           const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;

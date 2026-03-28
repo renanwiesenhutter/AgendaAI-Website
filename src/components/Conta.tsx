@@ -1,14 +1,34 @@
 import React from 'react';
 import { Mail, Smartphone, UserRound } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { fetchAccountByPhone } from '../services/accountService';
+import type { AccountWebhookResponse } from '../types/account';
+import {
+  formatCurrencyBRL,
+  formatDatePtBR,
+  formatPhoneBR,
+  formatSubscriptionInterval,
+  getDigits,
+  normalizePhoneForWebhook
+} from '../utils/accountFormatters';
 
 const TOKEN_KEY = 'agendaai_token';
 const AUTH_PHONE_KEY = 'agendaai_auth_phone';
+const ACCOUNT_PHONE_KEY = 'agendaai_user_phone';
 
 type UserData = {
   name: string;
   email: string;
   whatsapp: string;
+};
+
+type SubscriptionData = {
+  planName: string;
+  amount: number | null;
+  currency: string;
+  interval: string;
+  nextBillingDate: string;
+  portalUrl: string;
 };
 
 export default function Conta() {
@@ -17,10 +37,20 @@ export default function Conta() {
   const [showSignOutConfirm, setShowSignOutConfirm] = React.useState(false);
   const [assetsReady, setAssetsReady] = React.useState(false);
   const [bootVisible, setBootVisible] = React.useState(true);
+  const [accountLoading, setAccountLoading] = React.useState(true);
+  const [accountError, setAccountError] = React.useState('');
   const [user, setUser] = React.useState<UserData>({
-    name: 'Renan',
-    email: 'email@gmail.com',
-    whatsapp: '(45) 99145-3366'
+    name: '',
+    email: '',
+    whatsapp: ''
+  });
+  const [subscription, setSubscription] = React.useState<SubscriptionData>({
+    planName: '',
+    amount: null,
+    currency: 'BRL',
+    interval: '',
+    nextBillingDate: '',
+    portalUrl: ''
   });
 
   const [billingName, setBillingName] = React.useState('');
@@ -45,6 +75,95 @@ export default function Conta() {
       navigate('/login', { replace: true });
     }
   }, [navigate]);
+
+  const applyAccountPayload = React.useCallback((payload: AccountWebhookResponse, requestPhone: string) => {
+    const apiAccount = payload.account ?? null;
+    const apiSubscription = payload.subscription ?? null;
+
+    const normalizedPhone = normalizePhoneForWebhook(apiAccount?.phone || requestPhone);
+    const displayPhone = formatPhoneBR(normalizedPhone || requestPhone);
+
+    if (normalizedPhone) {
+      localStorage.setItem(ACCOUNT_PHONE_KEY, normalizedPhone);
+    }
+
+    setUser({
+      name: apiAccount?.name?.trim() || 'Nome nao informado',
+      email: apiAccount?.email?.trim() || 'Email nao informado',
+      whatsapp: displayPhone || '-'
+    });
+
+    setSubscription({
+      planName: apiSubscription?.plan_name?.trim() || 'Plano nao informado',
+      amount: typeof apiSubscription?.amount === 'number' ? apiSubscription.amount : null,
+      currency: apiSubscription?.currency?.trim() || 'BRL',
+      interval: apiSubscription?.interval?.trim() || '',
+      nextBillingDate: apiSubscription?.next_billing_date?.trim() || '',
+      portalUrl: apiSubscription?.portal_url?.trim() || ''
+    });
+  }, []);
+
+  const getPhoneFromToken = React.useCallback(() => {
+    const token = localStorage.getItem(TOKEN_KEY) || '';
+    const tokenParts = token.split('.');
+    if (tokenParts.length < 2) return '';
+
+    try {
+      const base64 = tokenParts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(window.atob(base64)) as Record<string, unknown>;
+
+      const directPhone = typeof payload.phone === 'string' ? payload.phone : '';
+      if (directPhone) return directPhone;
+
+      const whatsapp = typeof payload.whatsapp === 'string' ? payload.whatsapp : '';
+      if (whatsapp) return whatsapp;
+
+      const userPayload = payload.user as Record<string, unknown> | undefined;
+      if (userPayload && typeof userPayload.phone === 'string') {
+        return userPayload.phone;
+      }
+    } catch {
+      return '';
+    }
+
+    return '';
+  }, []);
+
+  const loadAccountData = React.useCallback(async (forceRefresh = false) => {
+    const persistedPhone =
+      localStorage.getItem(ACCOUNT_PHONE_KEY) ||
+      localStorage.getItem(AUTH_PHONE_KEY) ||
+      getPhoneFromToken() ||
+      '';
+    const normalizedPhone = normalizePhoneForWebhook(persistedPhone);
+
+    if (!normalizedPhone) {
+      setAccountError('Nao foi possivel identificar o telefone da conta logada.');
+      setAccountLoading(false);
+      return;
+    }
+
+    setAccountLoading(true);
+    setAccountError('');
+
+    try {
+      const payload = await fetchAccountByPhone(normalizedPhone, { force: forceRefresh });
+      applyAccountPayload(payload, normalizedPhone);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Nao foi possivel carregar os dados da conta.';
+      setAccountError(message);
+      setUser((prev) => ({
+        ...prev,
+        whatsapp: prev.whatsapp || formatPhoneBR(normalizedPhone)
+      }));
+    } finally {
+      setAccountLoading(false);
+    }
+  }, [applyAccountPayload, getPhoneFromToken]);
+
+  React.useEffect(() => {
+    void loadAccountData(false);
+  }, [loadAccountData]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -106,14 +225,14 @@ export default function Conta() {
   }, []);
 
   React.useEffect(() => {
-    if (!assetsReady) return;
+    if (!assetsReady || accountLoading) return;
     const timeoutId = window.setTimeout(() => {
       setBootVisible(false);
     }, 80);
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [assetsReady]);
+  }, [accountLoading, assetsReady]);
 
   React.useEffect(() => {
     if (!showSignOutConfirm) return;
@@ -133,7 +252,7 @@ export default function Conta() {
   const handlePhoneChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const raw = event.target.value;
 
-    let digits = raw.replace(/\D/g, '');
+    let digits = getDigits(raw);
     const startsIntl = /^\s*(\+|00)/.test(raw);
     if ((startsIntl || digits.length > 11) && digits.startsWith('55')) {
       digits = digits.slice(2);
@@ -181,7 +300,7 @@ export default function Conta() {
   };
 
   const validatePhone = (value: string) => {
-    const digits = value.replace(/\D/g, '');
+    const digits = getDigits(value);
     if (digits.length === 0) return '';
     if (digits.length < 10) return 'Seu telefone está incompleto.';
     return '';
@@ -206,6 +325,10 @@ export default function Conta() {
   const emailError = getEmailError();
   const phoneError = getPhoneError();
   const groupError = nameError || emailError || phoneError;
+  const subscriptionAmountLabel = formatCurrencyBRL(subscription.amount, subscription.currency);
+  const subscriptionIntervalLabel = formatSubscriptionInterval(subscription.interval);
+  const nextBillingDateLabel = formatDatePtBR(subscription.nextBillingDate);
+  const canOpenPortal = Boolean(subscription.portalUrl);
 
   const openBillingEditor = () => {
     setBillingName(user.name);
@@ -233,6 +356,7 @@ export default function Conta() {
   const confirmSignOut = () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(AUTH_PHONE_KEY);
+    localStorage.removeItem(ACCOUNT_PHONE_KEY);
     navigate('/', { replace: true });
   };
 
@@ -335,7 +459,7 @@ export default function Conta() {
           </div>
 
           <p className="hidden lg:block max-w-[360px] text-3xl lg:text-[28px] leading-tight font-semibold tracking-tight">
-            Bem vindo de volta,<br />{user.name}.
+            Bem vindo de volta,<br />{user.name || 'Usuario'}.
           </p>
 
           <button
@@ -382,20 +506,33 @@ export default function Conta() {
                 Visualize e gerencie as informações da sua assinatura.
               </p>
 
+              {accountError ? (
+                <div className="mt-3 rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-[14px] text-[#b91c1c]">
+                  {accountError}
+                  <button
+                    type="button"
+                    onClick={() => void loadAccountData(true)}
+                    className="ml-2 font-semibold underline underline-offset-2 hover:opacity-80"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : null}
+
               <div className="mt-4 bg-transparent">
                 <div className="flex items-center gap-3" style={{ paddingTop: '10px', paddingBottom: '4px' }}>
                   <UserRound className="h-5 w-5 text-[#9CA3AF]" />
-                  <span className="text-[16px] text-[#1F2937]">{user.name}</span>
+                  <span className="text-[16px] text-[#1F2937]">{user.name || 'Nome nao informado'}</span>
                 </div>
 
                 <div className="flex items-center gap-3" style={{ paddingTop: '4px', paddingBottom: '4px' }}>
                   <Mail className="h-5 w-5 text-[#9CA3AF]" />
-                  <span className="text-[16px] text-[#1F2937]">{user.email}</span>
+                  <span className="text-[16px] text-[#1F2937]">{user.email || 'Email nao informado'}</span>
                 </div>
 
                 <div className="flex items-center gap-3" style={{ paddingTop: '4px', paddingBottom: '2px' }}>
                   <Smartphone className="h-5 w-5 text-[#9CA3AF]" strokeWidth={2.4} />
-                  <span className="text-[16px] text-[#1F2937]">{user.whatsapp}</span>
+                  <span className="text-[16px] text-[#1F2937]">{user.whatsapp || '-'}</span>
                 </div>
               </div>
 
@@ -424,22 +561,27 @@ export default function Conta() {
                   Assinatura atual
                 </p>
                 <p className="mt-4 text-[20px] leading-tight text-[#3C4257]">
-                  Agenda AI - Anual
+                  {subscription.planName}
                 </p>
                 <p className="mt-1 text-[24px] font-semibold leading-none text-[#3C4257]">
-                  R$ 118,80 por ano
+                  {subscriptionAmountLabel}
+                  {subscriptionIntervalLabel ? ` ${subscriptionIntervalLabel}` : ''}
                 </p>
                 <p className="mt-3 text-[14px] text-[#1a1f36]">
-                  Sua próxima data de faturamento é 22 de março de 2027.
+                  Sua proxima data de faturamento e {nextBillingDateLabel}.
                 </p>
               </div>
 
                 <button
                   type="button"
                   onClick={() => {
-                    window.open('https://billing.stripe.com/p/login/dRm4gy9hC2DGd8cgVA5ZC00', '_blank', 'noopener,noreferrer');
+                    if (!canOpenPortal) return;
+                    window.open(subscription.portalUrl, '_blank', 'noopener,noreferrer');
                   }}
-                  className="mt-10 w-full max-w-[380px] h-[50px] rounded-md border border-[#D1D5DB] bg-white text-[#374151] text-[16px] font-semibold hover:bg-[#F9FAFB] transition-colors"
+                  disabled={!canOpenPortal}
+                  className={`mt-10 w-full max-w-[380px] h-[50px] rounded-md border border-[#D1D5DB] bg-white text-[#374151] text-[16px] font-semibold transition-colors ${
+                    canOpenPortal ? 'hover:bg-[#F9FAFB]' : 'cursor-not-allowed opacity-60'
+                  }`}
                 >
                 Gerenciar Assinatura
               </button>
