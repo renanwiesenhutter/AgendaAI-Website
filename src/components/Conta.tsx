@@ -1,7 +1,7 @@
 import React from 'react';
 import { Mail, Smartphone, UserRound } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { fetchAccountByPhone } from '../services/accountService';
+import { fetchAccountByPhone, updateAccount } from '../services/accountService';
 import type { AccountWebhookResponse } from '../types/account';
 import {
   formatCurrencyBRL,
@@ -29,6 +29,13 @@ type SubscriptionData = {
   interval: string;
   nextBillingDate: string;
   portalUrl: string;
+};
+
+type SavePhase = 'idle' | 'verifying' | 'moving' | 'checking' | 'success';
+
+type BillingNotice = {
+  type: 'success' | 'error';
+  message: string;
 };
 
 export default function Conta() {
@@ -68,6 +75,17 @@ export default function Conta() {
     email: false,
     phone: false,
   });
+  const [savePhase, setSavePhase] = React.useState<SavePhase>('idle');
+  const [savingBilling, setSavingBilling] = React.useState(false);
+  const [loaderShiftPx, setLoaderShiftPx] = React.useState(150);
+  const [billingNotice, setBillingNotice] = React.useState<BillingNotice | null>(null);
+  const [initialBillingValues, setInitialBillingValues] = React.useState({
+    name: '',
+    email: '',
+    phone: '',
+  });
+  const saveButtonRef = React.useRef<HTMLButtonElement | null>(null);
+  const saveTimersRef = React.useRef<number[]>([]);
 
   React.useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -75,6 +93,22 @@ export default function Conta() {
       navigate('/login', { replace: true });
     }
   }, [navigate]);
+
+  const clearSaveTimers = React.useCallback(() => {
+    saveTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    saveTimersRef.current = [];
+  }, []);
+
+  const queueSaveTimer = React.useCallback((callback: () => void, delay: number) => {
+    const timerId = window.setTimeout(callback, delay);
+    saveTimersRef.current.push(timerId);
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      clearSaveTimers();
+    };
+  }, [clearSaveTimers]);
 
   const applyAccountPayload = React.useCallback((payload: AccountWebhookResponse, requestPhone: string) => {
     const apiAccount = payload.account ?? null;
@@ -93,14 +127,16 @@ export default function Conta() {
       whatsapp: displayPhone || '-'
     });
 
-    setSubscription({
-      planName: apiSubscription?.plan_name?.trim() || 'Plano nao informado',
-      amount: typeof apiSubscription?.amount === 'number' ? apiSubscription.amount : null,
-      currency: apiSubscription?.currency?.trim() || 'BRL',
-      interval: apiSubscription?.interval?.trim() || '',
-      nextBillingDate: apiSubscription?.next_billing_date?.trim() || '',
-      portalUrl: apiSubscription?.portal_url?.trim() || ''
-    });
+    if (apiSubscription) {
+      setSubscription({
+        planName: apiSubscription.plan_name?.trim() || 'Plano nao informado',
+        amount: typeof apiSubscription.amount === 'number' ? apiSubscription.amount : null,
+        currency: apiSubscription.currency?.trim() || 'BRL',
+        interval: apiSubscription.interval?.trim() || '',
+        nextBillingDate: apiSubscription.next_billing_date?.trim() || '',
+        portalUrl: apiSubscription.portal_url?.trim() || ''
+      });
+    }
   }, []);
 
   const getPhoneFromToken = React.useCallback(() => {
@@ -249,6 +285,20 @@ export default function Conta() {
 
   const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
 
+  const updateLoaderShift = React.useCallback(() => {
+    const buttonWidth = saveButtonRef.current?.offsetWidth;
+    if (!buttonWidth) return;
+    const distance = Math.max(0, buttonWidth / 2 - 32);
+    setLoaderShiftPx(distance);
+  }, []);
+
+  React.useEffect(() => {
+    if (!isEditingBilling) return;
+    updateLoaderShift();
+    window.addEventListener('resize', updateLoaderShift);
+    return () => window.removeEventListener('resize', updateLoaderShift);
+  }, [isEditingBilling, updateLoaderShift]);
+
   const handlePhoneChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const raw = event.target.value;
 
@@ -325,21 +375,42 @@ export default function Conta() {
   const emailError = getEmailError();
   const phoneError = getPhoneError();
   const groupError = nameError || emailError || phoneError;
+  const isSaveAnimating = savePhase !== 'idle';
+  const saveSubmitDisabled = savingBilling || Boolean(groupError);
   const subscriptionAmountLabel = formatCurrencyBRL(subscription.amount, subscription.currency);
   const subscriptionIntervalLabel = formatSubscriptionInterval(subscription.interval);
   const nextBillingDateLabel = formatDatePtBR(subscription.nextBillingDate);
   const canOpenPortal = Boolean(subscription.portalUrl);
 
   const openBillingEditor = () => {
+    clearSaveTimers();
+    setSavePhase('idle');
+    setSavingBilling(false);
+    setBillingNotice(null);
     setBillingName(user.name);
     setBillingEmail(user.email);
     setBillingPhone(user.whatsapp);
+    setInitialBillingValues({
+      name: user.name,
+      email: user.email,
+      phone: user.whatsapp,
+    });
     setTouched({ name: false, email: false, phone: false });
     setFocused({ name: false, email: false, phone: false });
     setIsEditingBilling(true);
   };
 
-  const closeBillingEditor = () => {
+  const closeBillingEditor = (options?: { restoreInitialValues?: boolean }) => {
+    clearSaveTimers();
+    setSavePhase('idle');
+    setSavingBilling(false);
+
+    if (options?.restoreInitialValues) {
+      setBillingName(initialBillingValues.name);
+      setBillingEmail(initialBillingValues.email);
+      setBillingPhone(initialBillingValues.phone);
+    }
+
     setIsEditingBilling(false);
     setTouched({ name: false, email: false, phone: false });
     setFocused({ name: false, email: false, phone: false });
@@ -347,6 +418,15 @@ export default function Conta() {
 
   const handleSignOut = () => {
     setShowSignOutConfirm(true);
+  };
+
+  const handleHeaderAction = () => {
+    if (isEditingBilling) {
+      closeBillingEditor({ restoreInitialValues: true });
+      return;
+    }
+
+    handleSignOut();
   };
 
   const cancelSignOut = () => {
@@ -360,8 +440,12 @@ export default function Conta() {
     navigate('/', { replace: true });
   };
 
-  const handleSaveBilling = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveBilling = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (savingBilling || isSaveAnimating) {
+      return;
+    }
 
     const submitNameError = validateName(billingName);
     const submitEmailError = validateEmail(billingEmail);
@@ -374,14 +458,74 @@ export default function Conta() {
       return;
     }
 
-    setUser((prev) => ({
-      ...prev,
-      name: billingName.trim() || prev.name,
-      email: billingEmail.trim() || prev.email,
-      whatsapp: billingPhone.trim() || prev.whatsapp,
-    }));
+    const submittedName = billingName.trim() || initialBillingValues.name || user.name;
+    const submittedEmail = billingEmail.trim() || initialBillingValues.email || user.email;
+    const submittedPhoneDisplay = billingPhone.trim() || initialBillingValues.phone || user.whatsapp;
+    const normalizedPhone = normalizePhoneForWebhook(submittedPhoneDisplay);
 
-    closeBillingEditor();
+    setBillingNotice(null);
+    setSavingBilling(true);
+    clearSaveTimers();
+    setSavePhase('verifying');
+
+    const saveStartedAt = performance.now();
+
+    try {
+      const payload = await updateAccount({
+        name: submittedName,
+        email: submittedEmail,
+        phone: submittedPhoneDisplay,
+        previous_name: initialBillingValues.name,
+        previous_email: initialBillingValues.email,
+        previous_phone: initialBillingValues.phone,
+      });
+
+      const payloadWithFallback: AccountWebhookResponse = {
+        ...payload,
+        account: {
+          name: payload.account?.name ?? submittedName,
+          email: payload.account?.email ?? submittedEmail,
+          phone: payload.account?.phone ?? normalizedPhone,
+        }
+      };
+
+      applyAccountPayload(payloadWithFallback, normalizedPhone);
+      setBillingNotice(null);
+
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const elapsedSinceVerifying = performance.now() - saveStartedAt;
+      const minimumVerifyingMs = prefersReducedMotion ? 280 : 900;
+      const remainingVerifyingMs = Math.max(0, minimumVerifyingMs - elapsedSinceVerifying);
+
+      if (remainingVerifyingMs > 0) {
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, remainingVerifyingMs);
+        });
+      }
+
+      if (prefersReducedMotion) {
+        setSavePhase('success');
+        queueSaveTimer(() => {
+          closeBillingEditor();
+        }, 1080);
+        return;
+      }
+
+      setSavePhase('moving');
+      queueSaveTimer(() => setSavePhase('checking'), 900);
+      queueSaveTimer(() => setSavePhase('success'), 1500);
+      queueSaveTimer(() => {
+        closeBillingEditor();
+        void loadAccountData(true);
+      }, 2500);
+    } catch (error) {
+      setSavingBilling(false);
+      setSavePhase('idle');
+      const message = error instanceof Error && error.message.trim()
+        ? error.message
+        : 'Nao foi possivel atualizar os dados da conta agora. Tente novamente.';
+      setBillingNotice({ type: 'error', message });
+    }
   };
 
   if (bootVisible) {
@@ -441,14 +585,18 @@ export default function Conta() {
           <div className="mb-0 lg:mb-12 flex flex-col items-start">
             <button
               type="button"
-              onClick={handleSignOut}
-              className="mt-0 mb-2 inline-flex lg:hidden items-center gap-1.5 text-white/90 hover:text-white transition-colors"
-              aria-label="Sair"
+              onClick={handleHeaderAction}
+              className="mt-0 mb-2 inline-flex lg:hidden items-center gap-1 text-white/90 hover:text-white transition-colors"
+              aria-label={isEditingBilling ? 'Voltar para minha conta' : 'Sair'}
             >
-              <svg viewBox="0 0 16 16" className="h-[12px] w-[12px]" fill="currentColor" aria-hidden="true">
-                <path d="M5.994 2.38a.875.875 0 1 0-1.238-1.238l-4.25 4.25A.849.849 0 0 0 .25 6c0 .232.093.466.257.63l4.25 4.24a.875.875 0 1 0 1.236-1.24L3.238 6.875h7.387C12.492 6.875 14 8.271 14 10c0 1.797-1.578 3.375-3.375 3.375a.875.875 0 0 0 0 1.75c2.763 0 5.125-2.362 5.125-5.125 0-2.83-2.43-4.872-5.12-4.875H3.24l2.754-2.746Z" />
+              <svg viewBox="0 0 16 16" className="h-[14px] w-[14px] shrink-0" fill="currentColor" aria-hidden="true">
+                {isEditingBilling ? (
+                  <path d="M4.72.97a.75.75 0 0 1 1.06 1.06L2.56 5.25h8.69a.75.75 0 0 1 0 1.5H2.56l3.22 3.22a.75.75 0 1 1-1.06 1.06l-4.5-4.5a.748.748 0 0 1 0-1.06l4.5-4.5Z" />
+                ) : (
+                  <path d="M5.994 2.38a.875.875 0 1 0-1.238-1.238l-4.25 4.25A.849.849 0 0 0 .25 6c0 .232.093.466.257.63l4.25 4.24a.875.875 0 1 0 1.236-1.24L3.238 6.875h7.387C12.492 6.875 14 8.271 14 10c0 1.797-1.578 3.375-3.375 3.375a.875.875 0 0 0 0 1.75c2.763 0 5.125-2.362 5.125-5.125 0-2.83-2.43-4.872-5.12-4.875H3.24l2.754-2.746Z" />
+                )}
               </svg>
-              <span className="text-[14px] leading-none">Sair</span>
+              <span className="inline-flex items-center text-[14px] leading-[14px]">{isEditingBilling ? 'Voltar para minha conta' : 'Sair'}</span>
             </button>
 
             <div className="mt-1 lg:mt-10 lg:ml-0">
@@ -464,14 +612,18 @@ export default function Conta() {
 
           <button
             type="button"
-            onClick={handleSignOut}
+            onClick={handleHeaderAction}
             className="hidden lg:flex mt-4 items-center gap-1.5 text-white hover:opacity-90 transition-opacity"
-            aria-label="Sair"
+            aria-label={isEditingBilling ? 'Voltar para minha conta' : 'Sair'}
           >
-            <svg viewBox="0 0 16 16" className="h-[12px] w-[12px]" fill="currentColor" aria-hidden="true">
-              <path d="M5.994 2.38a.875.875 0 1 0-1.238-1.238l-4.25 4.25A.849.849 0 0 0 .25 6c0 .232.093.466.257.63l4.25 4.24a.875.875 0 1 0 1.236-1.24L3.238 6.875h7.387C12.492 6.875 14 8.271 14 10c0 1.797-1.578 3.375-3.375 3.375a.875.875 0 0 0 0 1.75c2.763 0 5.125-2.362 5.125-5.125 0-2.83-2.43-4.872-5.12-4.875H3.24l2.754-2.746Z" />
+            <svg viewBox="0 0 16 16" className="h-[12px] w-[12px] shrink-0" fill="currentColor" aria-hidden="true">
+              {isEditingBilling ? (
+                <path d="M4.72.97a.75.75 0 0 1 1.06 1.06L2.56 5.25h8.69a.75.75 0 0 1 0 1.5H2.56l3.22 3.22a.75.75 0 1 1-1.06 1.06l-4.5-4.5a.748.748 0 0 1 0-1.06l4.5-4.5Z" />
+              ) : (
+                <path d="M5.994 2.38a.875.875 0 1 0-1.238-1.238l-4.25 4.25A.849.849 0 0 0 .25 6c0 .232.093.466.257.63l4.25 4.24a.875.875 0 1 0 1.236-1.24L3.238 6.875h7.387C12.492 6.875 14 8.271 14 10c0 1.797-1.578 3.375-3.375 3.375a.875.875 0 0 0 0 1.75c2.763 0 5.125-2.362 5.125-5.125 0-2.83-2.43-4.872-5.12-4.875H3.24l2.754-2.746Z" />
+              )}
             </svg>
-            <span className="text-[14px] font-medium leading-none">Sair</span>
+            <span className="inline-flex items-center text-[14px] font-medium leading-[14px]">{isEditingBilling ? 'Voltar para minha conta' : 'Sair'}</span>
           </button>
         </div>
 
@@ -591,7 +743,7 @@ export default function Conta() {
               <div className="text-[14px] text-[#4B5563] flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={closeBillingEditor}
+                  onClick={() => closeBillingEditor({ restoreInitialValues: true })}
                   className="font-semibold hover:text-[#111827] transition-colors"
                 >
                   Conta
@@ -621,6 +773,7 @@ export default function Conta() {
                     value={billingName}
                     maxLength={30}
                     placeholder={user.name}
+                    disabled={savingBilling}
                     onChange={(event) => setBillingName(event.target.value)}
                     onFocus={() => setFocused((prev) => ({ ...prev, name: true }))}
                     onBlur={() => {
@@ -651,6 +804,7 @@ export default function Conta() {
                     value={billingEmail}
                     maxLength={50}
                     placeholder={user.email}
+                    disabled={savingBilling}
                     onChange={(event) => setBillingEmail(event.target.value)}
                     onFocus={() => setFocused((prev) => ({ ...prev, email: true }))}
                     onBlur={() => {
@@ -687,6 +841,7 @@ export default function Conta() {
                     autoComplete="tel"
                     value={billingPhone}
                     placeholder={user.whatsapp}
+                    disabled={savingBilling}
                     onChange={handlePhoneChange}
                     onFocus={() => setFocused((prev) => ({ ...prev, phone: true }))}
                     onBlur={() => {
@@ -703,17 +858,106 @@ export default function Conta() {
                 </div>
 
                 {groupError ? <p className="mt-3 text-[14px] text-red-600">{groupError}</p> : null}
+                {billingNotice?.type === 'error' ? (
+                  <p className="mt-3 text-[14px] text-red-600">{billingNotice.message}</p>
+                ) : null}
 
                 <button
+                  ref={saveButtonRef}
                   type="submit"
-                  className="mt-10 w-[350px] h-[48px] rounded-md bg-gradient-to-r from-blue-500 to-green-600 text-white text-[16px] font-semibold shadow-[0_10px_18px_-14px_rgba(99,91,255,0.35)] hover:opacity-95 transition-opacity"
+                  disabled={saveSubmitDisabled}
+                  className={`relative mt-10 w-[350px] h-[48px] rounded-md text-white text-[16px] font-semibold bg-gradient-to-r from-blue-500 to-green-600 disabled:cursor-default ${
+                    saveSubmitDisabled && !isSaveAnimating ? 'opacity-70' : 'opacity-100'
+                  } ${
+                    savingBilling ? 'shadow-none' : 'shadow-[0_10px_18px_-14px_rgba(99,91,255,0.35)]'
+                  }`}
+                  style={{
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden'
+                  }}
                 >
-                  Salvar
+                  <span
+                    className="pointer-events-none absolute inset-0 rounded-md bg-[#1ea56f] will-change-[opacity]"
+                    style={{
+                      opacity: savePhase === 'moving' || savePhase === 'checking' || savePhase === 'success' ? 1 : 0,
+                      transition:
+                        savePhase === 'moving' || savePhase === 'checking' || savePhase === 'success'
+                          ? 'opacity 760ms cubic-bezier(0.22, 1, 0.36, 1)'
+                          : 'opacity 220ms ease'
+                    }}
+                  />
+
+                  <span className={`relative z-[1] transition-opacity duration-250 ${isSaveAnimating ? 'opacity-0' : 'opacity-100'}`}>
+                    Salvar
+                  </span>
+
+                  <span
+                    className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center text-white text-[16px] font-semibold transition-all duration-300"
+                    style={{
+                      opacity: savePhase === 'verifying' ? 1 : 0,
+                      transform:
+                        savePhase === 'verifying'
+                          ? 'translate3d(0,0,0)'
+                          : savePhase === 'moving' || savePhase === 'checking' || savePhase === 'success'
+                            ? 'translate3d(-8px,0,0)'
+                            : 'translate3d(10px,0,0)'
+                    }}
+                  >
+                    Salvando...
+                  </span>
+
+                  {isSaveAnimating && (
+                    <span
+                      className="pointer-events-none absolute top-1/2 right-[21px] h-[22px] w-[22px] will-change-transform"
+                      style={{
+                        transform: `translate3d(${savePhase === 'verifying' ? '0px' : `-${loaderShiftPx}px`}, -50%, 0)`,
+                        transition:
+                          savePhase === 'moving'
+                            ? 'transform 980ms cubic-bezier(0.65, 0, 1, 1)'
+                            : 'transform 180ms ease'
+                      }}
+                    >
+                      {savePhase === 'checking' || savePhase === 'success' ? (
+                        <svg className="h-full w-full login-check-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="2" opacity="0.9" className="login-check-orbit" />
+                          <path
+                            d="M7.2 12.4L10.3 15.5"
+                            stroke="white"
+                            strokeWidth="1.7"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="login-check-path-1"
+                          />
+                          <path
+                            d="M10.3 15.5L16.8 9"
+                            stroke="white"
+                            strokeWidth="1.7"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="login-check-path-2"
+                          />
+                        </svg>
+                      ) : (
+                        <svg className="h-full w-full login-spinner-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <circle
+                            cx="12"
+                            cy="12"
+                            r="9"
+                            stroke="white"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeDasharray="44 100"
+                          />
+                        </svg>
+                      )}
+                    </span>
+                  )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={closeBillingEditor}
+                  onClick={() => closeBillingEditor({ restoreInitialValues: true })}
+                  disabled={savingBilling}
                   className="mt-4 w-[350px] h-[48px] rounded-md border border-[#D1D5DB] text-[#374151] text-[16px] font-semibold hover:bg-[#F9FAFB] transition-colors"
                 >
                   Cancelar
@@ -812,6 +1056,61 @@ export default function Conta() {
             }
           }
 
+          .login-spinner-spin {
+            animation: login-spinner-rotate 780ms linear infinite;
+            transform-origin: center;
+          }
+
+          .login-check-icon {
+            animation: login-check-pop 260ms cubic-bezier(0.16, 1, 0.3, 1);
+          }
+
+          .login-check-orbit {
+            stroke-dasharray: 57;
+            stroke-dashoffset: 57;
+            animation: login-check-orbit 360ms ease-out forwards;
+          }
+
+          .login-check-path-1,
+          .login-check-path-2 {
+            stroke-dasharray: 16;
+            stroke-dashoffset: 16;
+            animation: login-check-stroke 240ms ease-out forwards;
+          }
+
+          .login-check-path-2 {
+            animation-delay: 80ms;
+          }
+
+          @keyframes login-spinner-rotate {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+
+          @keyframes login-check-pop {
+            from {
+              opacity: 0;
+              transform: scale(0.78);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+
+          @keyframes login-check-orbit {
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+
+          @keyframes login-check-stroke {
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+
           @media (prefers-reduced-motion: reduce) {
             .signout-modal-enter {
               animation: none;
@@ -822,6 +1121,14 @@ export default function Conta() {
             }
 
             .account-step-enter {
+              animation: none;
+            }
+
+            .login-spinner-spin,
+            .login-check-icon,
+            .login-check-orbit,
+            .login-check-path-1,
+            .login-check-path-2 {
               animation: none;
             }
           }

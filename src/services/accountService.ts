@@ -1,9 +1,19 @@
 import type { AccountWebhookResponse } from '../types/account';
 
 const ACCOUNT_ENDPOINT = 'https://n8n.dalzzen.com/webhook/account';
+const ACCOUNT_UPDATE_ENDPOINT = 'https://n8n.dalzzen.com/webhook/account/update';
 const inFlightByPhone = new Map<string, Promise<AccountWebhookResponse>>();
 const recentResponseByPhone = new Map<string, { payload: AccountWebhookResponse; timestamp: number }>();
 const RECENT_CACHE_MS = 1500;
+
+type AccountUpdateRequest = {
+  name: string;
+  email: string;
+  phone: string;
+  previous_name?: string;
+  previous_email?: string;
+  previous_phone?: string;
+};
 
 async function requestAccount(phone: string) {
   const response = await fetch(ACCOUNT_ENDPOINT, {
@@ -64,4 +74,32 @@ export async function fetchAccountByPhone(phone: string, options?: { force?: boo
 
   inFlightByPhone.set(normalizedPhone, promise);
   return promise;
+}
+
+export async function updateAccount(payload: AccountUpdateRequest) {
+  const response = await fetch(ACCOUNT_UPDATE_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  let responsePayload: AccountWebhookResponse | null = null;
+
+  try {
+    responsePayload = (await response.json()) as AccountWebhookResponse;
+  } catch {
+    throw new Error('Nao foi possivel salvar os dados da conta agora.');
+  }
+
+  if (!response.ok) {
+    throw new Error(responsePayload?.message || responsePayload?.error || 'Nao foi possivel salvar os dados da conta agora.');
+  }
+
+  if (!responsePayload?.success) {
+    throw new Error(responsePayload?.message || responsePayload?.error || 'Nao foi possivel salvar os dados da conta agora.');
+  }
+
+  return responsePayload;
 }
