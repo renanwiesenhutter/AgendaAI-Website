@@ -7,6 +7,7 @@ import Conta from './components/Conta';
 import TermsOfUse from './components/TermsOfUse';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import GoogleConnected from './components/GoogleConnected';
+import AITransparency from './components/AITransparency';
 
 export default function App() {
   const { pathname } = useLocation();
@@ -30,6 +31,7 @@ export default function App() {
       <Route path="/conta" element={<Conta />} />
       <Route path="/termos-de-uso" element={<TermsOfUse />} />
       <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+      <Route path="/transparencia-ia" element={<AITransparency />} />
       <Route path="/google/conectado" element={<GoogleConnected />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

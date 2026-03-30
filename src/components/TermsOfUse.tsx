@@ -40,6 +40,8 @@ Este documento visa prestar informações sobre o modo de utilização da plataf
 
 3.1.2 O **Agenda AI** envidará seus melhores esforços para manter estes Termos de Uso atualizados no que se refere às integrações com aplicativos, sistemas, dispositivos ou serviços de terceiros eventualmente disponibilizados ou integrados com a plataforma, incluindo a indicação dos respectivos parceiros. Contudo, em razão da natureza dinâmica dessas integrações, o **Agenda AI** não garante que a relação de serviços parceiros esteja permanentemente completa ou atualizada, não se responsabilizando por eventuais inconsistências temporárias entre as integrações efetivamente disponíveis e as informações constantes nestes Termos.
 
+3.1.3 Para execução das funcionalidades de interpretação de comandos e automação de agenda, o **Agenda AI** utiliza recursos da **OpenAI**, incluindo modelo treinado e configurado especificamente para o contexto de uso do **Agenda AI**.
+
 3.2 Atualmente, oferecemos dois tipos de plano: o plano **Mensal**, voltado para usuários individuais que desejam utilizar o Agenda AI por um período de um mês; e o plano **Anual**, destinado a usuários individuais que desejam contratar o serviço por um período maior, conforme condições e benefícios informados na página de planos/preços.
 
 3.2.1 Não há distinção de funcionalidades entre os planos, sendo que ambos dão acesso às mesmas funcionalidades do **Agenda AI**. A diferença entre eles está apenas no período de uso/ciclo de cobrança (mensal ou anual) e no fato de que o plano Anual pode oferecer teste grátis de 7 (sete) dias, quando disponível, antes do início da cobrança. Os detalhes, valores e eventuais condições promocionais de cada plano constam na página oficial de planos do **Agenda AI**.

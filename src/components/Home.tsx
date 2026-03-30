@@ -2029,6 +2029,14 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
                       Política de privacidade
                     </a>
                   </li>
+                  <li>
+                    <a
+                      href="/transparencia-ia"
+                      className="font-medium transition-all duration-200 text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-700 hover:from-blue-600 hover:to-green-500"
+                    >
+                      Transparência de IA
+                    </a>
+                  </li>
                 </ul>
               </div>
         

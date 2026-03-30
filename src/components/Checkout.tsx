@@ -2721,6 +2721,7 @@ React.useEffect(() => {
               <span className="w-px h-4 bg-gray-300"></span>
               <Link to="/termos-de-uso" className="hover:underline">Termos</Link>
               <Link to="/politica-de-privacidade" className="hover:underline">Privacidade</Link>
+              <Link to="/transparencia-ia" className="hover:underline">IA</Link>
             </div>
           </div>
         </section>
