@@ -613,7 +613,6 @@ export default function Login() {
           <div className="flex items-center gap-4 text-white/85">
             <Link to="/termos-de-uso" className="hover:text-white transition-colors">Termos</Link>
             <Link to="/politica-de-privacidade" className="hover:text-white transition-colors">Privacidade</Link>
-            <Link to="/transparencia-ia" className="hover:text-white transition-colors">Transparência IA</Link>
           </div>
         </div>
       </aside>
@@ -946,8 +945,6 @@ export default function Login() {
             <Link to="/termos-de-uso" className="hover:underline">Termos</Link>
             <span className="w-px h-4 bg-gray-300" aria-hidden="true"></span>
             <Link to="/politica-de-privacidade" className="hover:underline">Privacidade</Link>
-            <span className="w-px h-4 bg-gray-300" aria-hidden="true"></span>
-            <Link to="/transparencia-ia" className="hover:underline">IA</Link>
           </div>
         </div>
 

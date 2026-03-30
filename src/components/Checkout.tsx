@@ -342,9 +342,66 @@ function StripePaymentForm({
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [peComplete, setPeComplete] = React.useState(false);
+  const [confirmPhase, setConfirmPhase] = React.useState<"idle" | "verifying" | "moving" | "checking" | "success">("idle");
+  const [loaderShiftPx, setLoaderShiftPx] = React.useState(150);
+  const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+  const confirmTimersRef = useRef<number[]>([]);
 
   // 👉 NOVO: saber o método selecionado DENTRO do PaymentElement
   const [selectedType, setSelectedType] = React.useState<string | null>(null);
+  const isConfirmAnimating = confirmPhase !== "idle";
+
+  const clearConfirmTimers = React.useCallback(() => {
+    confirmTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    confirmTimersRef.current = [];
+  }, []);
+
+  const queueConfirmTimeout = React.useCallback((callback: () => void, delay: number) => {
+    const timeoutId = window.setTimeout(callback, delay);
+    confirmTimersRef.current.push(timeoutId);
+  }, []);
+
+  const updateLoaderShift = React.useCallback(() => {
+    const buttonWidth = confirmButtonRef.current?.offsetWidth;
+    if (!buttonWidth) return;
+    const distance = Math.max(0, buttonWidth / 2 - 32);
+    setLoaderShiftPx(distance);
+  }, []);
+
+  React.useEffect(() => {
+    updateLoaderShift();
+    window.addEventListener("resize", updateLoaderShift);
+    return () => window.removeEventListener("resize", updateLoaderShift);
+  }, [updateLoaderShift]);
+
+  React.useEffect(() => {
+    if (!isConfirmAnimating) return;
+    updateLoaderShift();
+  }, [isConfirmAnimating, updateLoaderShift]);
+
+  React.useEffect(() => {
+    return () => clearConfirmTimers();
+  }, [clearConfirmTimers]);
+
+  const finishWithConfirmAnimation = React.useCallback((amountCents?: number, brand?: string) => {
+    clearConfirmTimers();
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) {
+      setConfirmPhase("success");
+      queueConfirmTimeout(() => {
+        onSuccess(amountCents, brand);
+      }, 1080);
+      return;
+    }
+
+    setConfirmPhase("moving");
+    queueConfirmTimeout(() => setConfirmPhase("checking"), 900);
+    queueConfirmTimeout(() => setConfirmPhase("success"), 1500);
+    queueConfirmTimeout(() => {
+      onSuccess(amountCents, brand);
+    }, 2500);
+  }, [clearConfirmTimers, onSuccess, queueConfirmTimeout]);
 
   // o teu disabled original, mas só vale para cartão/PIX (quando não é apple_pay)
   const disabled = !stripe || !contactValid || loading || (selectedType !== "apple_pay" && !peComplete);
@@ -360,13 +417,17 @@ function StripePaymentForm({
 
     setLoading(true);
     setErrorMsg(null);
+    setConfirmPhase("verifying");
 
     const { error: submitErr } = await elements.submit();
     if (submitErr) {
       setErrorMsg(submitErr.message || "Complete os dados de pagamento.");
       setLoading(false);
+      setConfirmPhase("idle");
       return;
     }
+
+    let shouldResetLoading = true;
 
     try {
       const base = "https://n8n.dalzzen.com/webhook";
@@ -390,7 +451,9 @@ function StripePaymentForm({
 
           const result = await stripe.confirmSetup({ elements, clientSecret: cs, redirect: "if_required" });
           if (result.error) throw new Error(result.error.message || "Não foi possível processar.");
-          onSuccess(undefined, "DALZZEN");
+          shouldResetLoading = false;
+          finishWithConfirmAnimation(undefined, "DALZZEN");
+          return;
         } else {
           // ===== ANUAL SEM TRIAL → PaymentIntent em /payment/without/trial =====
           const res = await fetch(`${base}/payment/without/trial`, {
@@ -405,7 +468,9 @@ function StripePaymentForm({
 
           const pay = await stripe.confirmPayment({ elements, clientSecret: cs, redirect: "if_required" });
           if (pay.error) throw new Error(pay.error.message || "Falha ao confirmar o pagamento.");
-          onSuccess(pay.paymentIntent?.amount, "DALZZEN");
+          shouldResetLoading = false;
+          finishWithConfirmAnimation(pay.paymentIntent?.amount, "DALZZEN");
+          return;
         }
       } else {
         // ===== MENSAL → PaymentIntent =====
@@ -421,17 +486,65 @@ function StripePaymentForm({
 
         const pay = await stripe.confirmPayment({ elements, clientSecret: cs, redirect: "if_required" });
         if (pay.error) throw new Error(pay.error.message || "Falha ao confirmar o pagamento.");
-        onSuccess(pay.paymentIntent?.amount, "DALZZEN");
+        shouldResetLoading = false;
+        finishWithConfirmAnimation(pay.paymentIntent?.amount, "DALZZEN");
+        return;
       }
     } catch (err: any) {
       setErrorMsg(err?.message || "Erro inesperado ao processar.");
+      setConfirmPhase("idle");
     } finally {
-      setLoading(false);
+      if (shouldResetLoading) setLoading(false);
     }
   }
 
   return (
     <form onSubmit={onSubmit} className="rounded-lg p-0 space-y-6">
+      <style>{`
+        .login-spinner-spin {
+          animation: login-spinner-rotate 780ms linear infinite;
+          transform-origin: center;
+        }
+
+        .login-check-icon {
+          animation: login-check-pop 260ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .login-check-orbit {
+          stroke-dasharray: 57;
+          stroke-dashoffset: 57;
+          animation: login-check-orbit 360ms ease-out forwards;
+        }
+
+        .login-check-path-1,
+        .login-check-path-2 {
+          stroke-dasharray: 16;
+          stroke-dashoffset: 16;
+          animation: login-check-stroke 240ms ease-out forwards;
+        }
+
+        .login-check-path-2 {
+          animation-delay: 80ms;
+        }
+
+        @keyframes login-spinner-rotate {
+          to { transform: rotate(360deg); }
+        }
+
+        @keyframes login-check-pop {
+          from { opacity: 0; transform: scale(0.78); }
+          to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes login-check-orbit {
+          to { stroke-dashoffset: 0; }
+        }
+
+        @keyframes login-check-stroke {
+          to { stroke-dashoffset: 0; }
+        }
+      `}</style>
+
       {/* PaymentElement continua igual, com Apple Pay AUTOMÁTICO */}
       <PaymentElement
         options={{
@@ -470,30 +583,89 @@ function StripePaymentForm({
           </div>
         ) : (
           <button
+            ref={confirmButtonRef}
             type="submit"
             disabled={disabled}
             aria-disabled={disabled}
             aria-busy={loading || undefined}
             className={[
-              "w-full h-[55px] text-white font-medium rounded-lg transition-all",
+              "relative w-full h-[55px] text-white text-[16px] font-medium rounded-lg overflow-hidden transition-all",
               mode === "annual" ? "bg-gradient-to-r from-blue-500 to-green-600" : "bg-blue-600",
               disabled
-                ? "opacity-70 cursor-not-allowed pointer-events-none"
+                ? !isConfirmAnimating
+                  ? "opacity-70 cursor-not-allowed pointer-events-none"
+                  : "opacity-100 cursor-default pointer-events-none"
                 : mode === "annual"
                 ? "hover:opacity-90"
                 : "hover:bg-blue-700",
             ].join(" ")}
+            style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}
           >
-            <span className="grid grid-cols-[1.25rem_1fr_1.25rem] items-center px-6">
-              <span aria-hidden className="w-5 h-5" />
-              <span className="justify-self-center">
-                {loading ? "Processando..." : nowAmountCents === 0 ? "Iniciar teste" : "Assinar"}
-              </span>
-              <svg aria-hidden className={`justify-self-end w-5 h-5 ${loading ? "opacity-100" : "opacity-0"} transition-opacity animate-spin`} viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
-                <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              </svg>
+            <span
+              className="pointer-events-none absolute inset-0 rounded-lg bg-[#1ea56f] will-change-[opacity]"
+              style={{
+                opacity: confirmPhase === "moving" || confirmPhase === "checking" || confirmPhase === "success" ? 1 : 0,
+                transition:
+                  confirmPhase === "moving" || confirmPhase === "checking" || confirmPhase === "success"
+                    ? "opacity 760ms cubic-bezier(0.22, 1, 0.36, 1)"
+                    : "opacity 220ms ease",
+              }}
+            />
+
+            <span className={`relative z-[1] transition-opacity duration-250 ${isConfirmAnimating ? "opacity-0" : "opacity-100"}`}>
+              {nowAmountCents === 0 ? "Iniciar teste" : "Assinar"}
             </span>
+
+            <span
+              className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center text-white text-[16px] font-medium transition-all duration-300"
+              style={{
+                opacity: confirmPhase === "verifying" ? 1 : 0,
+                transform:
+                  confirmPhase === "verifying"
+                    ? "translate3d(0,0,0)"
+                    : confirmPhase === "moving" || confirmPhase === "checking" || confirmPhase === "success"
+                    ? "translate3d(-8px,0,0)"
+                    : "translate3d(10px,0,0)",
+              }}
+            >
+              Validando...
+            </span>
+
+            {isConfirmAnimating && (
+              <span
+                className="pointer-events-none absolute top-1/2 right-[21px] h-[22px] w-[22px] will-change-transform"
+                style={{
+                  transform: `translate3d(${confirmPhase === "verifying" ? "0px" : `-${loaderShiftPx}px`}, -50%, 0)`,
+                  transition: confirmPhase === "moving" ? "transform 980ms cubic-bezier(0.65, 0, 1, 1)" : "transform 180ms ease",
+                }}
+              >
+                {confirmPhase === "checking" || confirmPhase === "success" ? (
+                  <svg className="h-full w-full login-check-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="2" opacity="0.9" className="login-check-orbit" />
+                    <path
+                      d="M7.2 12.4L10.3 15.5"
+                      stroke="white"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="login-check-path-1"
+                    />
+                    <path
+                      d="M10.3 15.5L16.8 9"
+                      stroke="white"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="login-check-path-2"
+                    />
+                  </svg>
+                ) : (
+                  <svg className="h-full w-full login-spinner-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="44 100" />
+                  </svg>
+                )}
+              </span>
+            )}
           </button>
         )}
 
@@ -1038,19 +1210,57 @@ const [searchParams] = useSearchParams();
 const planQ = (searchParams.get("plan") || "").toLowerCase(); // "annual" | "monthly"
 const seg = location.pathname.split("/").pop()?.toLowerCase(); // .../checkout/mensal etc.
 
-const plan =
+const initialPlan =
   planQ === "monthly" || seg === "monthly" || seg === "mensal"
     ? "monthly"
     : "annual"; // default: annual
 
-const isAnnual = plan === "annual";
-const annualHasTrial = isAnnual && !(lookup.usedTrial === true);
+const [selectedPlan, setSelectedPlan] = React.useState<"annual" | "monthly">(initialPlan);
+const [upsellAnimating, setUpsellAnimating] = React.useState(false);
+const [forceAnnualNoTrial, setForceAnnualNoTrial] = React.useState(false);
+const appliedCouponRef = React.useRef<string | null>(null);
 
-const THEME_BG = isAnnual
+React.useEffect(() => {
+  setSelectedPlan(initialPlan);
+  setUpsellAnimating(false);
+  setForceAnnualNoTrial(false);
+}, [initialPlan]);
+
+const isAnnual = selectedPlan === "annual";
+const annualHasTrial = isAnnual && !forceAnnualNoTrial && !(lookup.usedTrial === true);
+
+const handleUpsellToggle = React.useCallback(() => {
+  if (upsellAnimating) return;
+  const nextPlan: "annual" | "monthly" = selectedPlan === "annual" ? "monthly" : "annual";
+  const couponCode = appliedCouponRef.current;
+
+  setUpsellAnimating(true);
+  if (nextPlan === "annual") setForceAnnualNoTrial(true);
+
+  window.setTimeout(async () => {
+    setSelectedPlan(nextPlan);
+    if (nextPlan === "monthly") setForceAnnualNoTrial(false);
+
+    if (couponCode) {
+      setApplied(null);
+      const revalidated = await validateCouponForPlan(couponCode, nextPlan);
+      if (revalidated.ok && revalidated.coupon) {
+        setApplied(revalidated.coupon);
+      }
+    }
+
+    setUpsellAnimating(false);
+  }, 1000);
+}, [selectedPlan, upsellAnimating]);
+
+const showAnnualTheme = isAnnual;
+const showUpsellBorderLoading = upsellAnimating && selectedPlan === "monthly";
+
+const THEME_BG = showAnnualTheme
   ? "bg-gradient-to-r from-blue-500 to-green-600" // anual
   : "bg-blue-600";                                  // mensal (mesmo azul do botão "Assinar")
 
-const OVERSCROLL_BG = isAnnual
+const OVERSCROLL_BG = showAnnualTheme
   ? "linear-gradient(90deg, #3b82f6 0%, #16a34a 100%)"
   : "#2563eb";
 
@@ -1323,9 +1533,6 @@ const handlePhoneChange = React.useCallback(
   const setupInitTimerRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
-    // zera o clientSecret quando trocar de plano (annual/monthly)
-    setClientSecret(null);
-
     const IS_DEV =
       typeof import.meta !== "undefined" ? !!import.meta.env.DEV : process.env.NODE_ENV !== "production";
     const delayMs = IS_DEV ? 250 : 0;
@@ -1351,7 +1558,7 @@ const handlePhoneChange = React.useCallback(
           // ✅ envia o plano atual para o n8n
           body: JSON.stringify({
             usage: "off_session",
-            plan, // "annual" | "monthly"
+            plan: initialPlan,
           }),
           signal: ac.signal,
         });
@@ -1378,7 +1585,7 @@ const handlePhoneChange = React.useCallback(
       }
       ac.abort();
     };
-  }, [plan]); // 👈 depende do plano selecionado
+  }, [initialPlan]);
 
   // 3) Memoiza as opções do Elements (evita re-mount)
   const elementsOptions = React.useMemo<StripeElementsOptions>(() => {
@@ -1409,13 +1616,13 @@ const handlePhoneChange = React.useCallback(
     }
   }, [lookup.hasActive, uiState]);
 
-  const onApplyCoupon = React.useCallback(async (code: string) => {
+  const validateCouponForPlan = React.useCallback(async (code: string, plan: "annual" | "monthly") => {
     // Map dos produtos por plano
     const PRODUCT_ANNUAL  = "prod_T2PHY72W240SPT";
     const PRODUCT_MONTHLY = "prod_T2PFiGU2QtGzY4";
 
-    // Decide o produto a partir do plano atual
-    const productId = isAnnual ? PRODUCT_ANNUAL : PRODUCT_MONTHLY;
+    // Decide o produto a partir do plano recebido
+    const productId = plan === "annual" ? PRODUCT_ANNUAL : PRODUCT_MONTHLY;
 
     try {
       const resp = await fetch("https://n8n.dalzzen.com/webhook/promo/validate", {
@@ -1428,19 +1635,26 @@ const handlePhoneChange = React.useCallback(
           code,
           mode: "subscription",
           productId,
-          plan: isAnnual ? "annual" : "monthly"
+          plan,
         })
       }).then(r => r.json());
 
       if (!resp.ok) return { ok: false, message: resp.message || "Código inválido." };
 
       const p = Number(resp.discount);
-      setApplied(Number.isFinite(p) ? { code, percentOff: p } : { code });
-      return { ok: true };
+      const coupon = Number.isFinite(p) ? { code, percentOff: p } : { code };
+      return { ok: true, coupon };
     } catch {
       return { ok: false, message: "Erro ao validar o cupom." };
     }
-  }, [isAnnual]);
+  }, []);
+
+  const onApplyCoupon = React.useCallback(async (code: string) => {
+    const resp = await validateCouponForPlan(code, selectedPlan);
+    if (!resp.ok) return { ok: false, message: resp.message || "Código inválido." };
+    if (resp.coupon) setApplied(resp.coupon);
+    return { ok: true };
+  }, [selectedPlan, validateCouponForPlan]);
 
   // Pega data da cobrança
   const trialDays = isAnnual ? 7 : 0;
@@ -1454,9 +1668,10 @@ const handlePhoneChange = React.useCallback(
     }).format(todayLocal);
   }, [trialDays]);
 
-  // preço cheio anual (em centavos) — fixo
-  const FULL_PRICE = isAnnual ? 11880 : 1990; // valores em centavos
-  const NEXT_INVOICE_MONTHLY_CENTS = 1990;
+  const FULL_PRICE_ANNUAL_CENTS = 11880;
+  const FULL_PRICE_MONTHLY_CENTS = 1990;
+  const FULL_PRICE = isAnnual ? FULL_PRICE_ANNUAL_CENTS : FULL_PRICE_MONTHLY_CENTS;
+  const NEXT_INVOICE_MONTHLY_CENTS = FULL_PRICE_MONTHLY_CENTS;
 
   type AppliedCoupon = {
     code: string;
@@ -1465,6 +1680,9 @@ const handlePhoneChange = React.useCallback(
   };
 
   const [applied, setApplied] = useState<AppliedCoupon | null>(null);
+  React.useEffect(() => {
+    appliedCouponRef.current = applied?.code ?? null;
+  }, [applied?.code]);
   const hasCouponApplied = Boolean(applied?.code);
   const fmtBRL = (cents: number) =>
     (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -1477,6 +1695,27 @@ const handlePhoneChange = React.useCallback(
   }, [applied, FULL_PRICE]);
 
   const subtotalAfterCents = Math.max(FULL_PRICE - discountValueCents, 0);
+
+  const discountOnMonthlyCents = useMemo(() => {
+    if (!applied) return 0;
+    if (applied.amountOff != null) return applied.amountOff;
+    if (applied.percentOff != null) return Math.round(FULL_PRICE_MONTHLY_CENTS * (applied.percentOff / 100));
+    return 0;
+  }, [applied]);
+
+  const discountOnAnnualCents = useMemo(() => {
+    if (!applied) return 0;
+    if (applied.amountOff != null) return applied.amountOff;
+    if (applied.percentOff != null) return Math.round(FULL_PRICE_ANNUAL_CENTS * (applied.percentOff / 100));
+    return 0;
+  }, [applied]);
+
+  const monthlySubtotalAfterCents = Math.max(FULL_PRICE_MONTHLY_CENTS - discountOnMonthlyCents, 0);
+  const annualSubtotalAfterCents = Math.max(FULL_PRICE_ANNUAL_CENTS - discountOnAnnualCents, 0);
+  const annualMonthlyEquivalentCents = Math.round(annualSubtotalAfterCents / 12);
+  const upsellSavingsCents = Math.max((monthlySubtotalAfterCents * 12) - annualSubtotalAfterCents, 0);
+  const showAnnualUpsell = initialPlan === "monthly" || selectedPlan === "monthly" || forceAnnualNoTrial;
+  const showAnnualComparison = showAnnualUpsell && isAnnual && !annualHasTrial;
 
   const nowAmountCents   = annualHasTrial ? 0 : subtotalAfterCents;
   const recurringAmountCents = subtotalAfterCents;
@@ -1493,7 +1732,7 @@ const buildExitPayload = React.useCallback(() => {
   const phoneValid = phoneDigits.length >= 10; // 10+ dígitos (fixo) ou 11 (cel)
 
   return {
-    plan,                             // "annual" | "monthly"
+    plan: selectedPlan,
     name: name.trim() || undefined,   // manda se tiver
     email: emailValid ? emailTrim : undefined,
     phone: phoneValid ? phoneDigits : undefined,
@@ -1502,7 +1741,7 @@ const buildExitPayload = React.useCallback(() => {
     uiState,
     userAgent: navigator.userAgent,
   };
-}, [plan, name, email, phone, applied?.code, lookup?.hasActive, uiState, gmailRegex]);
+}, [selectedPlan, name, email, phone, applied?.code, lookup?.hasActive, uiState, gmailRegex]);
 
 const fireExitOnce = React.useCallback((reason: string) => {
   // 1) não envia nada após sucesso
@@ -1763,16 +2002,16 @@ React.useEffect(() => {
                     text-white flex items-center justify-between px-4 h-14`}
       >
         <div className="flex items-baseline">
-          <span style={{ fontFamily: '"Lily Script One", cursive' }} className="text-[28px] leading-none">D</span>
-          <span style={{ fontFamily: '"Lobster", cursive' }} className="text-[28px] leading-none">alzzen</span>
+          <span style={{ fontFamily: '"Lily Script One", cursive' }} className="text-[20px] font-normal leading-none">D</span>
+          <span style={{ fontFamily: '"Lobster", cursive' }} className="text-[20px] font-normal leading-none">alzzen</span>
         </div>
-        <button type="button" onClick={() => setShowDetails(v => !v)} className="inline-flex items-center gap-2">
-          <span className="relative grid place-items-center w-[56px] h-5 leading-none text-sm">
-            <span className={["absolute","transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",showDetails ? "opacity-0 -translate-y-1" : "opacity-100 translate-y-0"].join(" ")}>Detalhes</span>
-            <span className={["absolute","transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",showDetails ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"].join(" ")}>Fechar</span>
+        <button type="button" onClick={() => setShowDetails(v => !v)} className="inline-flex items-center gap-0.5">
+          <span className="relative grid place-items-center w-[60px] h-5 leading-none text-[13px] text-[#ffffffe6]">
+            <span className={["absolute font-medium underline decoration-dotted underline-offset-[3px] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",showDetails ? "opacity-0 -translate-y-1" : "opacity-100 translate-y-0"].join(" ")}>Detalhes</span>
+            <span className={["absolute font-medium underline decoration-dotted underline-offset-[3px] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",showDetails ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"].join(" ")}>Fechar</span>
           </span>
-          <svg className={["w-5 h-5 transform-gpu translate-y-[0.5px]","transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",showDetails ? "rotate-180" : "rotate-0"].join(" ")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M6 9l6 6 6-6" />
+          <svg className={["w-3 h-3 transform-gpu translate-y-[0.5px]","transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",showDetails ? "rotate-180" : "rotate-0"].join(" ")} focusable="false" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+            <path d="M10.193 3.97a.75.75 0 0 1 1.062 1.062L6.53 9.756a.75.75 0 0 1-1.06 0L.745 5.032A.75.75 0 0 1 1.807 3.97L6 8.163l4.193-4.193z" fillRule="evenodd" />
           </svg>
         </button>
       </header>
@@ -1791,47 +2030,53 @@ React.useEffect(() => {
         } top-[calc(3.5rem-1px)]`}
       >
         <div className={`${THEME_BG} text-white`}>
-          <div className="px-4 py-4">
-            <div className="flex gap-3">
-              <div className="col-start-1 row-start-1 row-span-2 w-10 h-10 bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center overflow-hidden">
-                <img src="/images/Logo.png" alt="Logo Agenda AI" className="w-full h-full object-cover" />
-              </div>
-            
-              <div className="flex-1 flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium leading-tight">
-                    {`Agenda AI - ${isAnnual ? "Anual" : "Mensal"}`}
-                  </p>
+          <div className="px-4 pt-1 pb-4">
+            <div className="w-[356px] max-w-full mx-auto">
+              <div className="pt-1">
+                <div className="flex gap-3">
+                  <div className="col-start-1 row-start-1 row-span-2 w-10 h-10 bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center overflow-hidden">
+                    <img src="/images/Logo.png" alt="Logo Agenda AI" className="w-full h-full object-cover" />
+                  </div>
 
-                  {isAnnual ? (
-                    !annualHasTrial ? (
-                      <p className="text-xs text-[#FFFFFF80] mt-1">Cobrado anualmente</p>
-                    ) : null
-                  ) : (
-                    <p className="text-xs text-[#FFFFFF80] mt-1">Cobrado mensalmente</p>
-                  )}
-                </div>
-            
-                <div className="text-right leading-tight self-start">
-                  {isAnnual ? (
-                    annualHasTrial ? (
-                      <>
-                        <p className="text-sm font-semibold">7 dias grátis</p>
-                        <p className="text-xs font-medium text-[#FFFFFF80]">
-                          Depois {fmtBRL(subtotalAfterCents)}/ano
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-sm font-semibold">{fmtBRL(subtotalAfterCents)}</p>
-                    )
-                  ) : (
-                    <p className="text-sm font-semibold">{fmtBRL(subtotalAfterCents)}</p>
-                  )}
+                  <div className="flex-1 flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-medium leading-tight">
+                        {`Agenda AI - ${isAnnual ? "Anual" : "Mensal"}`}
+                      </p>
+
+                      {isAnnual ? (
+                        !annualHasTrial ? (
+                          <p className="text-xs text-[#FFFFFF80] mt-1">Cobrado anualmente</p>
+                        ) : null
+                      ) : (
+                        <p className="text-xs text-[#FFFFFF80] mt-1">Cobrado mensalmente</p>
+                      )}
+                    </div>
+
+                    <div className="text-right leading-tight self-start">
+                      {isAnnual ? (
+                        annualHasTrial ? (
+                          <>
+                            <p className="text-sm font-semibold">7 dias grátis</p>
+                            <p className="text-xs font-medium text-[#FFFFFF80]">
+                              Depois {fmtBRL(subtotalAfterCents)}/ano
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm font-medium">{fmtBRL(subtotalAfterCents)}</p>
+                        )
+                      ) : (
+                        <p className="text-sm font-medium">{fmtBRL(subtotalAfterCents)}</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
+
+
             </div>
-      
-            <hr className="my-4 border-white/20 ml-[52px]" />
+
+            <hr className="my-4 ml-[52px] border-white/20" />
       
             <div className="pl-[52px]">
               {/* ===== Subtotal + Cupom + hr ===== */}
@@ -2023,7 +2268,7 @@ React.useEffect(() => {
 
       {/* Layout em duas colunas */}
       <main
-        className={`flex flex-col lg:flex-row ${
+        className={`flex flex-col lg:flex-row transition-[min-height,padding-top] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           uiState === "success"
             ? "min-h-[100dvh] pt-0 md:pt-0"
             : "min-h-screen pt-14 md:pt-0"
@@ -2031,13 +2276,81 @@ React.useEffect(() => {
         >
         {/* COLUNA ESQUERDA */}
         <aside
-          className={`w-full lg:w-1/2 px-6 lg:px-10 flex text-white
+          className={`w-full lg:w-1/2 px-6 lg:px-10 flex text-white transition-[padding] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]
             ${uiState === "success" ? "py-2 lg:py-8" : "py-8"}
             ${THEME_BG}`}
         >
           <style>{`@keyframes stripe-sheen { 
             0% { transform: translateX(-120%) skewX(18deg);}  
             100% { transform: translateX(120%) skewX(18deg);} 
+          }
+          @keyframes upsell-border-walk {
+            0% {
+              top: 1px;
+              left: 8px;
+              width: 44%;
+              height: 1px;
+            }
+            24.9% {
+              top: 1px;
+              left: calc(100% - 8px - 44%);
+              width: 44%;
+              height: 1px;
+            }
+            25% {
+              top: 8px;
+              left: calc(100% - 2px);
+              width: 1px;
+              height: 44%;
+            }
+            49.9% {
+              top: calc(100% - 8px - 44%);
+              left: calc(100% - 2px);
+              width: 1px;
+              height: 44%;
+            }
+            50% {
+              top: calc(100% - 2px);
+              left: calc(100% - 8px - 44%);
+              width: 44%;
+              height: 1px;
+            }
+            74.9% {
+              top: calc(100% - 2px);
+              left: 8px;
+              width: 44%;
+              height: 1px;
+            }
+            75% {
+              top: calc(100% - 8px - 44%);
+              left: 1px;
+              width: 1px;
+              height: 44%;
+            }
+            99.9% {
+              top: 8px;
+              left: 1px;
+              width: 1px;
+              height: 44%;
+            }
+            100% {
+              top: 1px;
+              left: 8px;
+              width: 44%;
+              height: 1px;
+            }
+          }
+          @keyframes upsell-compare-drop {
+            0% {
+              max-height: 0;
+              opacity: 0;
+              transform: translateY(-6px);
+            }
+            100% {
+              max-height: 40px;
+              opacity: 1;
+              transform: translateY(0);
+            }
           }`}</style>
         
           {/* MOBILE — some após pagamento confirmado */}
@@ -2048,7 +2361,7 @@ React.useEffect(() => {
               }`}
             >
               <div className="mb-4 flex justify-center">
-                <div className="w-32 h-32 rounded-lg bg-gradient-to-r from-blue-500 to-green-600 flex items-center justify-center shadow-md shadow-black/10 overflow-hidden">
+                <div className="w-40 h-40 rounded-lg bg-gradient-to-r from-blue-500 to-green-600 flex items-center justify-center shadow-md shadow-black/10 overflow-hidden">
                   <img src="/images/Logo.png" alt="Logo Agenda AI" className="w-full h-full object-cover" />
                 </div>
               </div>
@@ -2068,18 +2381,32 @@ React.useEffect(() => {
                       </p>
                     </>
                   ) : (
-                    <h1 className="text-[30px] font-semibold mb-0">
-                      <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap align-top">
-                        <span>{fmtBRL(subtotalAfterCents)}</span>
-                        <span className="text-[14px] font-semibold leading-none text-[#ffffff99] -translate-y-[2px]">
-                          {"por\u00A0ano"}
+                    <>
+                      <h1 className="text-[28px] font-semibold mb-0">
+                        <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap align-top">
+                          <span>{fmtBRL(subtotalAfterCents)}</span>
+                          <span className="text-[14px] font-semibold leading-none text-[#ffffff99] -translate-y-[2px]">
+                            {"por\u00A0ano"}
+                          </span>
                         </span>
-                      </span>
-                    </h1>
+                      </h1>
+                      {showAnnualComparison ? (
+                        <div
+                          className="overflow-hidden mt-1"
+                          style={{ animation: "upsell-compare-drop 560ms cubic-bezier(0.22,1,0.36,1)" }}
+                        >
+                          <p className="text-[#ffffffcc] text-[14px] font-semibold leading-tight">
+                            <span className="line-through text-[#ffffff80] mr-1">{fmtBRL(monthlySubtotalAfterCents)}</span>
+                            <span>{fmtBRL(annualMonthlyEquivalentCents)}</span>
+                            <span className="text-[#ffffff99]"> / mês cobrado anualmente</span>
+                          </p>
+                        </div>
+                      ) : null}
+                    </>
                   )
                 ) : (
                   <>
-                    <h1 className="text-[30px] font-semibold mb-0">
+                    <h1 className="text-[28px] font-semibold mb-0">
                       <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap align-top">
                         <span>{fmtBRL(subtotalAfterCents)}</span>
                         <span className="text-[14px] font-semibold leading-none text-[#ffffff99] -translate-y-[2px]">
@@ -2111,6 +2438,51 @@ React.useEffect(() => {
                 </svg>
               </button>
               </div>
+
+              {showAnnualUpsell ? (
+              <div className="mt-4 w-[356px] max-w-full mx-auto">
+                <button
+                  type="button"
+                  onClick={handleUpsellToggle}
+                  disabled={upsellAnimating}
+                  className={`relative w-full h-[58px] rounded-[10px] border border-white/10 bg-white/10 px-4 py-3 text-left transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                    upsellAnimating ? "bg-white/12 opacity-80 cursor-not-allowed pointer-events-none" : "hover:bg-white/15"
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className={`pointer-events-none absolute -inset-[1px] rounded-[11px] transition-opacity duration-200 ${
+                      showUpsellBorderLoading ? "opacity-100" : "opacity-0"
+                    }`}
+                  >
+                    <span
+                      className="absolute rounded-full bg-[#22c55e]"
+                      style={{
+                        boxShadow: "0 0 1.5px rgba(34,197,94,0.8)",
+                        animation: "upsell-border-walk 1650ms linear infinite",
+                      }}
+                    />
+                  </span>
+
+                  <span className="relative z-10 flex items-center justify-between gap-3">
+                    <span className={`inline-flex h-[14px] w-[26px] items-center px-[1px] rounded-full ${isAnnual ? "bg-emerald-400/85" : "bg-white/50"}`}>
+                      <span
+                        className="h-3 w-3 rounded-full bg-white shadow-sm"
+                        style={{
+                          transform: isAnnual ? "translateX(10px)" : "translateX(0)",
+                          transition: "transform 280ms cubic-bezier(0.22, 1, 0.36, 1)",
+                        }}
+                      />
+                    </span>
+                    <span className="min-w-0 flex-1 text-[12px] font-medium leading-tight">
+                      <span className="inline rounded bg-[#CBF4C9] px-1.5 py-[1px] text-[#0E6245]">Economize {fmtBRL(upsellSavingsCents)}</span>
+                      <span className="ml-1 text-white font-medium">com cobrança anual</span>
+                    </span>
+                    <span className="text-[12px] font-medium text-white whitespace-nowrap">{fmtBRL(annualMonthlyEquivalentCents)}/mês</span>
+                  </span>
+                </button>
+              </div>
+              ) : null}
             </div>
           )}
         
@@ -2134,7 +2506,7 @@ React.useEffect(() => {
             </div>
           
             <div className="mb-6">
-              <p className="text-[#ffffff99] text-base mb-1 font-semibold">
+              <p className="text-[#ffffff99] text-base mb-1 font-medium">
                 {isAnnual ? (annualHasTrial ? "Testar Agenda AI - Anual" : "Assinar Agenda AI - Anual")
                 : "Assinar Agenda AI - Mensal"}
               </p>
@@ -2148,15 +2520,29 @@ React.useEffect(() => {
                     </p>
                   </>
                 ) : (
-                  <h1 className="text-4xl font-semibold mb-2">
-                    <span className="inline-flex items-start align-top">
-                      <span>{fmtBRL(subtotalAfterCents)}</span>
-                      <span className="ml-2 grid grid-rows-2 text-3xl font-semibold text-[#ffffff99] leading-none">
-                        <span className="text-[0.5em] leading-[1.5]">por</span>
-                        <span className="text-[0.5em] leading-[1]">ano</span>
+                  <>
+                    <h1 className="text-4xl font-semibold mb-1">
+                      <span className="inline-flex items-start align-top">
+                        <span>{fmtBRL(subtotalAfterCents)}</span>
+                        <span className="ml-2 grid grid-rows-2 text-3xl font-semibold text-[#ffffff99] leading-none">
+                          <span className="text-[0.5em] leading-[1.5]">por</span>
+                          <span className="text-[0.5em] leading-[1]">ano</span>
+                        </span>
                       </span>
-                    </span>
-                  </h1>
+                    </h1>
+                    {showAnnualComparison ? (
+                      <div
+                        className="overflow-hidden mt-1"
+                        style={{ animation: "upsell-compare-drop 560ms cubic-bezier(0.22,1,0.36,1)" }}
+                      >
+                        <p className="text-[#ffffffcc] text-[14px] font-semibold leading-tight">
+                          <span className="line-through text-[#ffffff80] mr-1">{fmtBRL(monthlySubtotalAfterCents)}</span>
+                          <span>{fmtBRL(annualMonthlyEquivalentCents)}</span>
+                          <span className="text-[#ffffff99]"> / mês cobrado anualmente</span>
+                        </p>
+                      </div>
+                    ) : null}
+                  </>
                 )
               ) : (
               <h1 className="text-4xl font-semibold mb-2">
@@ -2173,36 +2559,85 @@ React.useEffect(() => {
           
             <div className="bg-white/0 backdrop-blur-sm rounded-lg pl-0 pr-4 py-4 mb-6">
               <div className="grid grid-cols-[2.5rem_1fr_auto] gap-x-3 items-start">
-                <div className="col-start-1 row-start-1 row-span-2 w-10 h-10 bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center overflow-hidden">
-                  <img src="/images/Logo.png" alt="Logo Agenda AI" className="w-full h-full object-cover" />
+                <div className="col-start-1 col-span-3 rounded-[10px] border border-white/10 bg-transparent overflow-hidden">
+                  <div className="grid grid-cols-[2.5rem_1fr_auto] gap-x-3 items-start px-4 py-4">
+                    <div className="col-start-1 row-start-1 row-span-2 w-10 h-10 bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center overflow-hidden">
+                      <img src="/images/Logo.png" alt="Logo Agenda AI" className="w-full h-full object-cover" />
+                    </div>
+
+                    <p className="col-start-2 text-sm font-medium leading-tight">
+                      {`Agenda AI - ${isAnnual ? "Anual" : "Mensal"}`}
+                    </p>
+
+                    {!isAnnual && (
+                      <p className="col-start-2 text-xs text-[#FFFFFF80] mt-1">Cobrado mensalmente</p>
+                    )}
+                    {isAnnual && !annualHasTrial && (
+                      <p className="col-start-2 text-xs text-[#FFFFFF80] mt-1">Cobrado anualmente</p>
+                    )}
+
+                    <div className="col-start-3 row-start-1 self-start text-right">
+                      {isAnnual ? (
+                        annualHasTrial ? (
+                          <>
+                            <p className="text-sm font-medium">7 dias grátis</p>
+                            <p className="text-xs text-[#ffffff80]">Depois {fmtBRL(subtotalAfterCents)}/ano</p>
+                          </>
+                        ) : (
+                          <p className="text-sm font-medium">{fmtBRL(subtotalAfterCents)}</p>
+                        )
+                      ) : (
+                        <p className="text-sm font-medium">{fmtBRL(subtotalAfterCents)}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {showAnnualUpsell ? (
+                    <div className="border-t border-[#5aa8ff]/45 bg-white/[0.03]">
+                      <button
+                        type="button"
+                        onClick={handleUpsellToggle}
+                        disabled={upsellAnimating}
+                        className={`relative w-full h-[44px] text-left px-3 py-2 bg-transparent transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                          upsellAnimating ? "opacity-80 cursor-not-allowed pointer-events-none" : "hover:bg-white/[0.06]"
+                        }`}
+                      >
+                          <span
+                            aria-hidden
+                            className={`pointer-events-none absolute -inset-[1px] rounded-[11px] transition-opacity duration-200 ${
+                              showUpsellBorderLoading ? "opacity-100" : "opacity-0"
+                            }`}
+                          >
+                            <span
+                              className="absolute rounded-full bg-[#22c55e]"
+                              style={{
+                                boxShadow: "0 0 1.5px rgba(34,197,94,0.8)",
+                                animation: "upsell-border-walk 1650ms linear infinite",
+                              }}
+                            />
+                          </span>
+
+                          <span className="relative z-10 flex items-center justify-between gap-3">
+                            <span className={`inline-flex h-[14px] w-[26px] items-center px-[1px] rounded-full ${isAnnual ? "bg-emerald-400/85" : "bg-white/50"}`}>
+                              <span
+                                className="h-3 w-3 rounded-full bg-white shadow-sm"
+                                style={{
+                                  transform: isAnnual ? "translateX(10px)" : "translateX(0)",
+                                  transition: "transform 280ms cubic-bezier(0.22, 1, 0.36, 1)",
+                                }}
+                              />
+                            </span>
+                            <span className="min-w-0 flex-1 text-[12px] font-medium leading-tight">
+                              <span className="inline rounded bg-[#CBF4C9] px-1.5 py-[1px] text-[#0E6245]">Economize {fmtBRL(upsellSavingsCents)}</span>
+                              <span className="ml-1 text-white">com cobrança anual</span>
+                            </span>
+                            <span className="text-[12px] font-medium text-white whitespace-nowrap">{fmtBRL(annualMonthlyEquivalentCents)}/mês</span>
+                          </span>
+                        </button>
+                    </div>
+                  ) : null}
                 </div>
 
-                <p className="col-start-2 text-sm font-medium leading-tight">
-                  {`Agenda AI - ${isAnnual ? "Anual" : "Mensal"}`}
-                </p>
-
-                {!isAnnual && (
-                  <p className="col-start-2 text-xs text-[#FFFFFF80] mt-1">Cobrado mensalmente</p>
-                )}
-                {isAnnual && !annualHasTrial && (
-                  <p className="col-start-2 text-xs text-[#FFFFFF80] mt-1">Cobrado anualmente</p>
-                )}
-
-                <div className="col-start-3 row-start-1 self-start text-right">
-                  {isAnnual ? (
-                    annualHasTrial ? (
-                      <>
-                        <p className="text-sm font-medium">7 dias grátis</p>
-                        <p className="text-xs text-[#ffffff80]">Depois {fmtBRL(subtotalAfterCents)}/ano</p>
-                      </>
-                    ) : (
-                      <p className="text-sm font-semibold">{fmtBRL(subtotalAfterCents)}</p>
-                    )
-                  ) : (
-                    <p className="text-sm font-semibold">{fmtBRL(subtotalAfterCents)}</p>
-                  )}
-                </div>
-                          
                 <hr className="col-start-2 col-span-2 my-4 border-white/20" />
           
                 {/* ===== Subtotal + Cupom + hr ===== */}
@@ -2510,11 +2945,13 @@ React.useEffect(() => {
                                   type="button"
                                   aria-describedby="tip-name"
                                   className={[
-                                    "ml-2 text-[14px] lg:text-[16px] leading-none select-none focus:outline-none peer cursor-default",
+                                    "ml-2 leading-none select-none focus:outline-none peer cursor-default",
                                     nameError ? "text-red-500" : "text-gray-400",
                                   ].join(" ")}
                                 >
-                                  ⓘ
+                                  <svg focusable="false" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                    <path d="M6 12C9.28235 12 12 9.28235 12 6C12 2.72353 9.27647 0 5.99412 0C2.71765 0 0 2.72353 0 6C0 9.28235 2.72353 12 6 12ZM6 11C3.22353 11 1.00588 8.77647 1.00588 6C1.00588 3.22941 3.21765 1 5.99412 1C8.77059 1 10.9941 3.22941 11 6C11.0059 8.77647 8.77647 11 6 11ZM5.94706 3.90588C6.37647 3.90588 6.71177 3.56471 6.71177 3.14118C6.71177 2.71176 6.37647 2.37059 5.94706 2.37059C5.52353 2.37059 5.18235 2.71176 5.18235 3.14118C5.18235 3.56471 5.52353 3.90588 5.94706 3.90588ZM4.97059 9.23529H7.36471C7.60588 9.23529 7.79412 9.06471 7.79412 8.82353C7.79412 8.59412 7.60588 8.41177 7.36471 8.41177H6.63529V5.41765C6.63529 5.1 6.47647 4.88824 6.17647 4.88824H5.18235C4.94118 4.88824 4.75294 5.07059 4.75294 5.3C4.75294 5.54118 4.94118 5.71176 5.18235 5.71176H5.7V8.41177H4.97059C4.72941 8.41177 4.54118 8.59412 4.54118 8.82353C4.54118 9.06471 4.72941 9.23529 4.97059 9.23529Z" fill="currentColor" />
+                                  </svg>
                                 </button>
         
                                 <div
@@ -2574,11 +3011,13 @@ React.useEffect(() => {
                                   type="button"
                                   aria-describedby="tip-email"
                                   className={[
-                                    "ml-2 text-[14px] lg:text-[16px] leading-none select-none focus:outline-none peer cursor-default",
+                                    "ml-2 leading-none select-none focus:outline-none peer cursor-default",
                                     emailError ? "text-red-500" : "text-gray-400",
                                   ].join(" ")}
                                 >
-                                  ⓘ
+                                  <svg focusable="false" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                    <path d="M6 12C9.28235 12 12 9.28235 12 6C12 2.72353 9.27647 0 5.99412 0C2.71765 0 0 2.72353 0 6C0 9.28235 2.72353 12 6 12ZM6 11C3.22353 11 1.00588 8.77647 1.00588 6C1.00588 3.22941 3.21765 1 5.99412 1C8.77059 1 10.9941 3.22941 11 6C11.0059 8.77647 8.77647 11 6 11ZM5.94706 3.90588C6.37647 3.90588 6.71177 3.56471 6.71177 3.14118C6.71177 2.71176 6.37647 2.37059 5.94706 2.37059C5.52353 2.37059 5.18235 2.71176 5.18235 3.14118C5.18235 3.56471 5.52353 3.90588 5.94706 3.90588ZM4.97059 9.23529H7.36471C7.60588 9.23529 7.79412 9.06471 7.79412 8.82353C7.79412 8.59412 7.60588 8.41177 7.36471 8.41177H6.63529V5.41765C6.63529 5.1 6.47647 4.88824 6.17647 4.88824H5.18235C4.94118 4.88824 4.75294 5.07059 4.75294 5.3C4.75294 5.54118 4.94118 5.71176 5.18235 5.71176H5.7V8.41177H4.97059C4.72941 8.41177 4.54118 8.59412 4.54118 8.82353C4.54118 9.06471 4.72941 9.23529 4.97059 9.23529Z" fill="currentColor" />
+                                  </svg>
                                 </button>
         
                                 <div
@@ -2640,11 +3079,13 @@ React.useEffect(() => {
                                   type="button"
                                   aria-describedby="tip-phone"
                                   className={[
-                                    "ml-2 text-[14px] lg:text-[16px] leading-none select-none focus:outline-none peer cursor-default",
+                                    "ml-2 leading-none select-none focus:outline-none peer cursor-default",
                                     phoneError ? "text-red-500" : "text-gray-400",
                                   ].join(" ")}
                                 >
-                                  ⓘ
+                                  <svg focusable="false" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                    <path d="M6 12C9.28235 12 12 9.28235 12 6C12 2.72353 9.27647 0 5.99412 0C2.71765 0 0 2.72353 0 6C0 9.28235 2.72353 12 6 12ZM6 11C3.22353 11 1.00588 8.77647 1.00588 6C1.00588 3.22941 3.21765 1 5.99412 1C8.77059 1 10.9941 3.22941 11 6C11.0059 8.77647 8.77647 11 6 11ZM5.94706 3.90588C6.37647 3.90588 6.71177 3.56471 6.71177 3.14118C6.71177 2.71176 6.37647 2.37059 5.94706 2.37059C5.52353 2.37059 5.18235 2.71176 5.18235 3.14118C5.18235 3.56471 5.52353 3.90588 5.94706 3.90588ZM4.97059 9.23529H7.36471C7.60588 9.23529 7.79412 9.06471 7.79412 8.82353C7.79412 8.59412 7.60588 8.41177 7.36471 8.41177H6.63529V5.41765C6.63529 5.1 6.47647 4.88824 6.17647 4.88824H5.18235C4.94118 4.88824 4.75294 5.07059 4.75294 5.3C4.75294 5.54118 4.94118 5.71176 5.18235 5.71176H5.7V8.41177H4.97059C4.72941 8.41177 4.54118 8.59412 4.54118 8.82353C4.54118 9.06471 4.72941 9.23529 4.97059 9.23529Z" fill="currentColor" />
+                                  </svg>
                                 </button>
         
                                 <div
@@ -2721,7 +3162,6 @@ React.useEffect(() => {
               <span className="w-px h-4 bg-gray-300"></span>
               <Link to="/termos-de-uso" className="hover:underline">Termos</Link>
               <Link to="/politica-de-privacidade" className="hover:underline">Privacidade</Link>
-              <Link to="/transparencia-ia" className="hover:underline">IA</Link>
             </div>
           </div>
         </section>
