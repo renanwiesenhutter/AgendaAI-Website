@@ -211,7 +211,7 @@ function WalletPRB({
       prRef.current = null;
       handlerAttached.current = false;
     };
-  }, [stripe, enabled, mode, nowAmountCents, recurringAmountCents]);
+  }, [stripe, enabled, mode, nowAmountCents, recurringAmountCents, annualHasTrial, couponCode]);
 
   // anexa o handler UMA vez por instância (quando paymentRequest existir)
   React.useEffect(() => {
@@ -303,7 +303,7 @@ function WalletPRB({
       },
       // se usar displayItems, atualize aqui também
     });
-  }, [nowAmountCents, mode]);
+  }, [nowAmountCents, mode, recurringAmountCents, annualHasTrial]);
 
   // memoriza as options para não trocar identidade a cada render
   const prbOptions = React.useMemo(() => ({
@@ -573,6 +573,7 @@ function StripePaymentForm({
               <div className="absolute inset-0 z-10 cursor-not-allowed" role="presentation" aria-hidden="true" />
             )}
           <WalletPRB
+            key={`prb-${mode}-${annualHasTrial ? "trial" : "paid"}-${nowAmountCents}-${recurringAmountCents}-${couponCode ?? "nocoupon"}`}
             enabled={true}
             mode={mode}
             name={name}
