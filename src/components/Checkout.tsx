@@ -52,7 +52,7 @@ body.lock-scroll {
 
 // === Helpers (topo do arquivo) ===
 const PRICE_CENTS_DEFAULT = 11880; // ajuste se seu backend devolver outro valor
-const BRAND_DEFAULT = "DALZZEN";
+const BRAND_DEFAULT = "AGENDA AI";
 
 function formatBRL(cents: number) {
   try {
@@ -98,6 +98,8 @@ function WalletPRB({
 
   // cria o PRB só quando Stripe/enable/mode mudarem (NÃO em cada tecla/campo)
   React.useEffect(() => {
+    let cancelled = false;
+
     if (!stripe || !enabled) {
       setPaymentRequest(null);
       prRef.current = null;
@@ -194,6 +196,7 @@ function WalletPRB({
     } as any);
 
     pr.canMakePayment().then((res) => {
+      if (cancelled) return;
       if (res?.applePay || res?.googlePay) {
         prRef.current = pr;
         setPaymentRequest(pr);
@@ -203,6 +206,7 @@ function WalletPRB({
     });
 
     return () => {
+      cancelled = true;
       setPaymentRequest(null);
       prRef.current = null;
       handlerAttached.current = false;
@@ -242,7 +246,7 @@ function WalletPRB({
             if (error) { ev.complete("fail"); return; }
 
             ev.complete("success");
-            onSuccess(undefined, "DALZZEN");
+            onSuccess(undefined, "AGENDA AI");
           } else {
             // ===== ANUAL SEM TRIAL → PaymentIntent em /payment/without/trial =====
             const r = await fetch(`${base}/payment/without/trial`, {
@@ -260,7 +264,7 @@ function WalletPRB({
             if (pay.error) { ev.complete("fail"); return; }
 
             ev.complete("success");
-            onSuccess(pay.paymentIntent?.amount, "DALZZEN");
+            onSuccess(pay.paymentIntent?.amount, "AGENDA AI");
           }
         } else {
           // ===== MENSAL (sem trial) → PaymentIntent =====
@@ -279,7 +283,7 @@ function WalletPRB({
           if (pay.error) { ev.complete("fail"); return; }
 
           ev.complete("success");
-          onSuccess(pay.paymentIntent?.amount, "DALZZEN");
+          onSuccess(pay.paymentIntent?.amount, "AGENDA AI");
         }
       } catch {
         ev.complete("fail");
@@ -452,7 +456,7 @@ function StripePaymentForm({
           const result = await stripe.confirmSetup({ elements, clientSecret: cs, redirect: "if_required" });
           if (result.error) throw new Error(result.error.message || "Não foi possível processar.");
           shouldResetLoading = false;
-          finishWithConfirmAnimation(undefined, "DALZZEN");
+          finishWithConfirmAnimation(undefined, "AGENDA AI");
           return;
         } else {
           // ===== ANUAL SEM TRIAL → PaymentIntent em /payment/without/trial =====
@@ -469,7 +473,7 @@ function StripePaymentForm({
           const pay = await stripe.confirmPayment({ elements, clientSecret: cs, redirect: "if_required" });
           if (pay.error) throw new Error(pay.error.message || "Falha ao confirmar o pagamento.");
           shouldResetLoading = false;
-          finishWithConfirmAnimation(pay.paymentIntent?.amount, "DALZZEN");
+          finishWithConfirmAnimation(pay.paymentIntent?.amount, "AGENDA AI");
           return;
         }
       } else {
@@ -487,7 +491,7 @@ function StripePaymentForm({
         const pay = await stripe.confirmPayment({ elements, clientSecret: cs, redirect: "if_required" });
         if (pay.error) throw new Error(pay.error.message || "Falha ao confirmar o pagamento.");
         shouldResetLoading = false;
-        finishWithConfirmAnimation(pay.paymentIntent?.amount, "DALZZEN");
+        finishWithConfirmAnimation(pay.paymentIntent?.amount, "AGENDA AI");
         return;
       }
     } catch (err: any) {
@@ -1376,7 +1380,7 @@ const [receiptAmountCents, setReceiptAmountCents] = React.useState(PRICE_CENTS_D
 // chama isto quando o pagamento for confirmado:
 function startSuccessTransition(amountCents?: number, brand?: string) {
   setReceiptAmountCents(amountCents ?? 11800);
-  setReceiptBrand((brand ?? "DALZZEN").toUpperCase());
+  setReceiptBrand((brand ?? "AGENDA AI").toUpperCase());
   setUiState("success");
 
   // Feche qualquer painel e limpe foco do Stripe (evita “voltar” pro meio da página)
@@ -1990,14 +1994,14 @@ React.useEffect(() => {
   }
 
   return (
-    <div className={`min-h-screen ${THEME_BG} md:bg-transparent`}>
+    <div className={`min-h-screen ${uiState === "success" ? "bg-white" : `${THEME_BG} md:bg-transparent`}`}>
       {/* BG fixo mobile — só antes de pagar */}
       {uiState !== "success" && (
         <div className={`md:hidden fixed inset-0 -z-10 ${THEME_BG}`} />
       )}
 
       {/* Header mobile */}
-      <header
+      {uiState !== "success" && <header
         className={`md:hidden fixed top-0 inset-x-0 z-50 ${THEME_BG}
                     text-white flex items-center justify-between px-4 h-14`}
       >
@@ -2014,9 +2018,9 @@ React.useEffect(() => {
             <path d="M10.193 3.97a.75.75 0 0 1 1.062 1.062L6.53 9.756a.75.75 0 0 1-1.06 0L.745 5.032A.75.75 0 0 1 1.807 3.97L6 8.163l4.193-4.193z" fillRule="evenodd" />
           </svg>
         </button>
-      </header>
+      </header>}
 
-      {showDetails && (
+      {uiState !== "success" && showDetails && (
         <div
           className="fixed inset-0 bg-black/30 z-30 transition-opacity duration-300"
           onClick={() => setShowDetails(false)}
@@ -2024,7 +2028,7 @@ React.useEffect(() => {
       )}
 
       {/* Painel de Detalhes — mobile */}
-      <div
+      {uiState !== "success" && <div
         className={`md:hidden fixed inset-x-0 z-40 transform-gpu transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           showDetails ? "translate-y-0" : "-translate-y-full"
         } top-[calc(3.5rem-1px)]`}
@@ -2264,7 +2268,7 @@ React.useEffect(() => {
             <div className="pb-[max(env(safe-area-inset-bottom),16px)]" />
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Layout em duas colunas */}
       <main
@@ -2272,13 +2276,12 @@ React.useEffect(() => {
           uiState === "success"
             ? "min-h-[100dvh] pt-0 md:pt-0"
             : "min-h-screen pt-14 md:pt-0"
-        } ${THEME_BG} md:bg-transparent`}
+        } ${uiState === "success" ? "bg-white" : `${THEME_BG} md:bg-transparent`}`}
         >
         {/* COLUNA ESQUERDA */}
         <aside
           className={`w-full lg:w-1/2 px-6 lg:px-10 flex text-white transition-[padding] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]
-            ${uiState === "success" ? "py-2 lg:py-8" : "py-8"}
-            ${THEME_BG}`}
+            ${uiState === "success" ? "py-2 lg:py-8 bg-white" : `py-8 ${THEME_BG}`}`}
         >
           <style>{`@keyframes stripe-sheen { 
             0% { transform: translateX(-120%) skewX(18deg);}  
@@ -2828,7 +2831,7 @@ React.useEffect(() => {
 
         {/* COLUNA DIREITA */}
         <section
-          className={`w-full lg:w-1/2 bg-white px-3 md:px-6 lg:px-10 py-8 flex items-start justify-start ${
+          className={`w-full ${uiState === "success" ? "" : "lg:w-1/2"} bg-white px-3 md:px-6 lg:px-10 py-8 flex items-start justify-start ${
             (uiState === "success" || lookup.hasActive) ? "min-h-0" : "min-h-screen"
           }`}
         >
