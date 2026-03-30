@@ -114,11 +114,14 @@ export default function Conta() {
     const apiAccount = payload.account ?? null;
     const apiSubscription = payload.subscription ?? null;
 
-    const normalizedPhone = normalizePhoneForWebhook(apiAccount?.phone || requestPhone);
+    const normalizedRequestPhone = normalizePhoneForWebhook(requestPhone);
+    const normalizedApiPhone = normalizePhoneForWebhook(apiAccount?.phone || '');
+    const normalizedPhone = normalizedRequestPhone || normalizedApiPhone;
     const displayPhone = formatPhoneBR(normalizedPhone || requestPhone);
 
     if (normalizedPhone) {
       localStorage.setItem(ACCOUNT_PHONE_KEY, normalizedPhone);
+      localStorage.setItem(AUTH_PHONE_KEY, normalizedPhone);
     }
 
     setUser({
@@ -483,9 +486,9 @@ export default function Conta() {
       const payloadWithFallback: AccountWebhookResponse = {
         ...payload,
         account: {
-          name: payload.account?.name ?? submittedName,
-          email: payload.account?.email ?? submittedEmail,
-          phone: payload.account?.phone ?? normalizedPhone,
+          name: submittedName,
+          email: submittedEmail,
+          phone: normalizedPhone,
         }
       };
 
@@ -516,7 +519,6 @@ export default function Conta() {
       queueSaveTimer(() => setSavePhase('success'), 1500);
       queueSaveTimer(() => {
         closeBillingEditor();
-        void loadAccountData(true);
       }, 2500);
     } catch (error) {
       setSavingBilling(false);
