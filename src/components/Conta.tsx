@@ -730,7 +730,7 @@ export default function Conta() {
                   type="button"
                   onClick={() => {
                     if (!canOpenPortal) return;
-                    window.open(subscription.portalUrl, '_blank', 'noopener,noreferrer');
+                    window.location.assign(subscription.portalUrl);
                   }}
                   disabled={!canOpenPortal}
                   className={`mt-10 w-full max-w-[380px] h-[50px] rounded-md border border-[#D1D5DB] bg-white text-[#374151] text-[16px] font-semibold transition-colors ${
