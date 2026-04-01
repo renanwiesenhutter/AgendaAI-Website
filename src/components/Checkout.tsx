@@ -1213,6 +1213,7 @@ const location = useLocation();
 const [searchParams] = useSearchParams();
 
 const planQ = (searchParams.get("plan") || "").toLowerCase(); // "annual" | "monthly"
+const upsellQ = (searchParams.get("upsell") || "").toLowerCase();
 const seg = location.pathname.split("/").pop()?.toLowerCase(); // .../checkout/mensal etc.
 
 const initialPlan =
@@ -1220,16 +1221,19 @@ const initialPlan =
     ? "monthly"
     : "annual"; // default: annual
 
+const shouldPresetUpsell =
+  initialPlan === "monthly" && ["1", "true", "yes", "on", "annual"].includes(upsellQ);
+
 const [selectedPlan, setSelectedPlan] = React.useState<"annual" | "monthly">(initialPlan);
 const [upsellAnimating, setUpsellAnimating] = React.useState(false);
 const [forceAnnualNoTrial, setForceAnnualNoTrial] = React.useState(false);
 const appliedCouponRef = React.useRef<string | null>(null);
 
 React.useEffect(() => {
-  setSelectedPlan(initialPlan);
+  setSelectedPlan(shouldPresetUpsell ? "annual" : initialPlan);
   setUpsellAnimating(false);
-  setForceAnnualNoTrial(false);
-}, [initialPlan]);
+  setForceAnnualNoTrial(shouldPresetUpsell);
+}, [initialPlan, shouldPresetUpsell]);
 
 const isAnnual = selectedPlan === "annual";
 const annualHasTrial = isAnnual && !forceAnnualNoTrial && !(lookup.usedTrial === true);
@@ -1403,6 +1407,35 @@ const handlePhoneChange = React.useCallback(
   (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
 
+    const formatPhoneForInput = (value: string) => {
+      let digits = value.replace(/\D/g, "");
+
+      const startsIntl = /^\s*(\+|00)/.test(value);
+      if ((startsIntl || digits.length > 11) && digits.startsWith("55")) {
+        digits = digits.slice(2);
+      }
+
+      digits = digits.slice(0, 11);
+
+      const ddd = digits.slice(0, 2);
+      const rest = digits.slice(2);
+
+      if (digits.length <= 2) {
+        return digits;
+      }
+
+      const prefix = `(${ddd}) `;
+      if (digits.length > 10) {
+        const p1 = rest.slice(0, 5);
+        const p2 = rest.slice(5, 9);
+        return prefix + (p2 ? `${p1}-${p2}` : p1);
+      }
+
+      const p1 = rest.slice(0, 4);
+      const p2 = rest.slice(4, 8);
+      return prefix + (p2 ? `${p1}-${p2}` : p1);
+    };
+
     // Mantém só dígitos
     let digits = raw.replace(/\D/g, "");
 
@@ -1415,39 +1448,42 @@ const handlePhoneChange = React.useCallback(
     // Limita a 11 (celular) — 10 se for fixo
     digits = digits.slice(0, 11);
 
-    // Detecta se está apagando
-    const deleting = digits.length < prevDigitsRef.current.length;
     prevDigitsRef.current = digits;
 
-    const ddd = digits.slice(0, 2);
-    const rest = digits.slice(2);
-
-    let formatted = "";
-
-    // ✅ Sem máscara enquanto houver até 2 dígitos (evita “guerra” com os parênteses)
-    if (digits.length <= 2) {
-      formatted = digits; // ex.: "3", "31"
-    } else {
-      // A partir de 3 dígitos, aplica máscara nacional
-      const prefix = `(${ddd}) `;
-
-      if (digits.length > 10) {
-        // Celular: (DD) 9xxxx-xxxx
-        const p1 = rest.slice(0, 5);
-        const p2 = rest.slice(5, 9);
-        formatted = prefix + (p2 ? `${p1}-${p2}` : p1);
-      } else {
-        // Fixo: (DD) xxxx-xxxx
-        const p1 = rest.slice(0, 4);
-        const p2 = rest.slice(4, 8);
-        formatted = prefix + (p2 ? `${p1}-${p2}` : p1);
-      }
-    }
+    const formatted = formatPhoneForInput(digits);
 
     setPhone(formatted);
   },
   []
 );
+
+React.useEffect(() => {
+  const state = (location.state as { prefill?: { name?: string; email?: string; phone?: string } } | null) || null;
+  const prefill = state?.prefill;
+  if (!prefill) return;
+
+  const safeName = (prefill.name || '').trim();
+  const safeEmail = (prefill.email || '').trim();
+  const phoneDigits = (prefill.phone || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
+
+  if (safeName && safeName.toLowerCase() !== 'nome nao informado') {
+    setName(safeName);
+  }
+
+  if (safeEmail && safeEmail.toLowerCase() !== 'email nao informado') {
+    setEmail(safeEmail);
+  }
+
+  if (phoneDigits.length >= 10) {
+    const ddd = phoneDigits.slice(0, 2);
+    const rest = phoneDigits.slice(2, 11);
+    const formattedPhone = phoneDigits.length > 10
+      ? `(${ddd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`
+      : `(${ddd}) ${rest.slice(0, 4)}-${rest.slice(4, 8)}`;
+    setPhone(formattedPhone);
+    prevDigitsRef.current = phoneDigits.slice(0, 11);
+  }
+}, [location.state]);
 
   // quais campos já foram tocados (saíram com blur)
   const [touched, setTouched] = React.useState({

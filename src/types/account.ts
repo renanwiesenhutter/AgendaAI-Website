@@ -7,6 +7,7 @@ export type AccountApiUser = {
 export type AccountApiSubscription = {
   plan_name?: string | null;
   status?: string | null;
+  access_state?: string | null;
   amount?: number | null;
   currency?: string | null;
   interval?: string | null;

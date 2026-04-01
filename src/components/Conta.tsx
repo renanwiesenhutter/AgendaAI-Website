@@ -29,6 +29,7 @@ type SubscriptionData = {
   interval: string;
   nextBillingDate: string;
   portalUrl: string;
+  accessState: string;
 };
 
 type SavePhase = 'idle' | 'verifying' | 'moving' | 'checking' | 'success';
@@ -51,14 +52,7 @@ export default function Conta() {
     email: '',
     whatsapp: ''
   });
-  const [subscription, setSubscription] = React.useState<SubscriptionData>({
-    planName: '',
-    amount: null,
-    currency: 'BRL',
-    interval: '',
-    nextBillingDate: '',
-    portalUrl: ''
-  });
+  const [subscription, setSubscription] = React.useState<SubscriptionData | null>(null);
 
   const [billingName, setBillingName] = React.useState('');
   const [billingEmail, setBillingEmail] = React.useState('');
@@ -137,9 +131,13 @@ export default function Conta() {
         currency: apiSubscription.currency?.trim() || 'BRL',
         interval: apiSubscription.interval?.trim() || '',
         nextBillingDate: apiSubscription.next_billing_date?.trim() || '',
-        portalUrl: apiSubscription.portal_url?.trim() || ''
+        portalUrl: apiSubscription.portal_url?.trim() || '',
+        accessState: apiSubscription.access_state?.trim().toLowerCase() || 'active'
       });
+      return;
     }
+
+    setSubscription(null);
   }, []);
 
   const getPhoneFromToken = React.useCallback(() => {
@@ -380,10 +378,15 @@ export default function Conta() {
   const groupError = nameError || emailError || phoneError;
   const isSaveAnimating = savePhase !== 'idle';
   const saveSubmitDisabled = savingBilling || Boolean(groupError);
-  const subscriptionAmountLabel = formatCurrencyBRL(subscription.amount, subscription.currency);
-  const subscriptionIntervalLabel = formatSubscriptionInterval(subscription.interval);
-  const nextBillingDateLabel = formatDatePtBR(subscription.nextBillingDate);
-  const canOpenPortal = Boolean(subscription.portalUrl);
+  const subscriptionAmountLabel = formatCurrencyBRL(subscription?.amount, subscription?.currency);
+  const subscriptionIntervalLabel = formatSubscriptionInterval(subscription?.interval);
+  const subscriptionDateLabel = formatDatePtBR(subscription?.nextBillingDate);
+  const canOpenPortal = Boolean(subscription?.portalUrl);
+  const isCancelingSubscription = subscription?.accessState === 'canceling';
+  const hasNoActiveSubscription = !subscription;
+  const subscriptionStatusMessage = subscription?.accessState === 'canceling'
+    ? `Sua assinatura expira em ${subscriptionDateLabel}.`
+    : `Sua próxima data de faturamento é ${subscriptionDateLabel}.`;
 
   const openBillingEditor = () => {
     clearSaveTimers();
@@ -714,30 +717,63 @@ export default function Conta() {
                 <p className="text-[14px] font-medium uppercase tracking-[0.08em] text-[#1A1F36]">
                   Assinatura atual
                 </p>
-                <p className="mt-4 text-[20px] leading-tight text-[#3C4257]">
-                  {subscription.planName}
-                </p>
-                <p className="mt-1 text-[24px] font-semibold leading-none text-[#3C4257]">
-                  {subscriptionAmountLabel}
-                  {subscriptionIntervalLabel ? ` ${subscriptionIntervalLabel}` : ''}
-                </p>
-                <p className="mt-3 text-[14px] text-[#1a1f36]">
-                  Sua proxima data de faturamento e {nextBillingDateLabel}.
-                </p>
+                {subscription ? (
+                  <>
+                    <p className="mt-4 text-[20px] leading-tight text-[#3C4257]">
+                      {subscription.planName}
+                    </p>
+                    <p className="mt-1 text-[24px] font-semibold leading-none text-[#3C4257]">
+                      {subscriptionAmountLabel}
+                      {subscriptionIntervalLabel ? ` ${subscriptionIntervalLabel}` : ''}
+                    </p>
+                    <p className={`mt-3 text-[14px] ${isCancelingSubscription ? 'text-[#c2410c]' : 'text-[#1a1f36]'}`}>
+                      {subscriptionStatusMessage}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-4 text-[20px] leading-tight text-[#b91c1c]">
+                      Sem assinatura ativa
+                    </p>
+                    <p className="mt-3 text-[14px] text-[#b91c1c]">
+                      Você não possui uma assinatura ativa no momento.
+                    </p>
+                  </>
+                )}
               </div>
 
                 <button
                   type="button"
                   onClick={() => {
+                    if (!subscription) {
+                      const prefillName = user.name && user.name !== 'Nome nao informado' ? user.name : '';
+                      const prefillEmail = user.email && user.email !== 'Email nao informado' ? user.email : '';
+                      const prefillPhone = user.whatsapp && user.whatsapp !== '-' ? user.whatsapp : '';
+
+                      navigate('/checkout?plan=monthly&upsell=1', {
+                        state: {
+                          prefill: {
+                            name: prefillName,
+                            email: prefillEmail,
+                            phone: prefillPhone
+                          }
+                        }
+                      });
+                      return;
+                    }
                     if (!canOpenPortal) return;
                     window.location.assign(subscription.portalUrl);
                   }}
-                  disabled={!canOpenPortal}
-                  className={`mt-10 w-full max-w-[380px] h-[50px] rounded-md border border-[#D1D5DB] bg-white text-[#374151] text-[16px] font-semibold transition-colors ${
-                    canOpenPortal ? 'hover:bg-[#F9FAFB]' : 'cursor-not-allowed opacity-60'
+                  disabled={Boolean(subscription) && !canOpenPortal}
+                  className={`mt-10 w-full max-w-[380px] h-[50px] rounded-md border text-[16px] font-semibold transition-colors ${
+                    hasNoActiveSubscription
+                      ? 'border-transparent bg-gradient-to-r from-blue-500 to-green-600 text-white hover:opacity-95'
+                      : 'border-[#D1D5DB] bg-white text-[#374151] hover:bg-[#F9FAFB]'
+                  } ${
+                    subscription && !canOpenPortal ? 'cursor-not-allowed opacity-60' : ''
                   }`}
                 >
-                Gerenciar Assinatura
+                {subscription ? 'Gerenciar Assinatura' : 'Assinar Agora'}
               </button>
             </>
           ) : (
