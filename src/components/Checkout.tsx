@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { CreditCard, Mail, UserRound, Smartphone, Lock, ChevronDown, Tag, X } from 'lucide-react';
-import { useSearchParams, useLocation, Link } from "react-router-dom";
+import { useSearchParams, useLocation, useNavigate, Link } from "react-router-dom";
 import type { StripeElementsOptions } from '@stripe/stripe-js';
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe, PaymentRequestButtonElement } from "@stripe/react-stripe-js";
@@ -1083,6 +1083,7 @@ function HeightTransition({
 
 /* === 3) Seu CheckoutPage permanece, mas agora NÃO remonta o PaymentElement ao digitar === */
 const CheckoutPage = () => {
+  const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [chipEnter, setChipEnter] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -1755,7 +1756,7 @@ React.useEffect(() => {
   const annualSubtotalAfterCents = Math.max(FULL_PRICE_ANNUAL_CENTS - discountOnAnnualCents, 0);
   const annualMonthlyEquivalentCents = Math.round(annualSubtotalAfterCents / 12);
   const upsellSavingsCents = Math.max((monthlySubtotalAfterCents * 12) - annualSubtotalAfterCents, 0);
-  const showAnnualUpsell = initialPlan === "monthly" || selectedPlan === "monthly" || forceAnnualNoTrial;
+  const showAnnualUpsell = !lookup.hasActive && (initialPlan === "monthly" || selectedPlan === "monthly" || forceAnnualNoTrial);
   const showAnnualComparison = showAnnualUpsell && isAnnual && !annualHasTrial;
 
   const nowAmountCents   = annualHasTrial ? 0 : subtotalAfterCents;
@@ -2908,16 +2909,18 @@ React.useEffect(() => {
                   />
               
                   <div className="mt-9 space-y-5 md:space-y-5">
-                    <a
-                      href={lookup.portalUrl || "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const isAuthenticated = typeof window !== 'undefined' && Boolean(localStorage.getItem('agendaai_token'));
+                        navigate(isAuthenticated ? '/conta' : '/login');
+                      }}
                       className="inline-flex items-center justify-center w-[358px] md:w-[380px] h-[44px] md:h-11 rounded-md text-white font-medium transition
-                                 bg-[#2563EB] hover:bg-[#1D4ED8]          
+                                 bg-blue-600 hover:bg-blue-700          
                                  shadow-[0_10px_18px_-14px_rgba(99,91,255,0.35)]" 
                     >
                       Gerenciar assinatura
-                    </a>
+                    </button>
               
                     <button
                       type="button"
