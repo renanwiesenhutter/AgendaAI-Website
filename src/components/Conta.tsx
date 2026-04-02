@@ -125,6 +125,12 @@ export default function Conta() {
     });
 
     if (apiSubscription) {
+      const subscriptionStatus = apiSubscription.status?.trim().toLowerCase() || '';
+      const subscriptionAccessState = apiSubscription.access_state?.trim().toLowerCase() || '';
+      const normalizedAccessState = subscriptionStatus === 'trialing'
+        ? 'trialing'
+        : subscriptionAccessState || subscriptionStatus || 'active';
+
       setSubscription({
         planName: apiSubscription.plan_name?.trim() || 'Plano nao informado',
         amount: typeof apiSubscription.amount === 'number' ? apiSubscription.amount : null,
@@ -132,7 +138,7 @@ export default function Conta() {
         interval: apiSubscription.interval?.trim() || '',
         nextBillingDate: apiSubscription.next_billing_date?.trim() || '',
         portalUrl: apiSubscription.portal_url?.trim() || '',
-        accessState: apiSubscription.access_state?.trim().toLowerCase() || 'active'
+        accessState: normalizedAccessState
       });
       return;
     }
@@ -383,9 +389,12 @@ export default function Conta() {
   const subscriptionDateLabel = formatDatePtBR(subscription?.nextBillingDate);
   const canOpenPortal = Boolean(subscription?.portalUrl);
   const isCancelingSubscription = subscription?.accessState === 'canceling';
+  const isTrialingSubscription = subscription?.accessState === 'trialing';
   const hasNoActiveSubscription = !subscription;
-  const subscriptionStatusMessage = subscription?.accessState === 'canceling'
+  const subscriptionStatusMessage = isCancelingSubscription
     ? `Sua assinatura expira em ${subscriptionDateLabel}.`
+    : isTrialingSubscription
+      ? `A avaliação gratuita termina em ${subscriptionDateLabel}.`
     : `Sua próxima data de faturamento é ${subscriptionDateLabel}.`;
 
   const openBillingEditor = () => {
@@ -723,8 +732,9 @@ export default function Conta() {
                       {subscription.planName}
                     </p>
                     <p className="mt-1 text-[24px] font-semibold leading-none text-[#3C4257]">
-                      {subscriptionAmountLabel}
-                      {subscriptionIntervalLabel ? ` ${subscriptionIntervalLabel}` : ''}
+                      {isTrialingSubscription
+                        ? '7 Dias Grátis'
+                        : `${subscriptionAmountLabel}${subscriptionIntervalLabel ? ` ${subscriptionIntervalLabel}` : ''}`}
                     </p>
                     <p className={`mt-3 text-[14px] ${isCancelingSubscription ? 'text-[#c2410c]' : 'text-[#1a1f36]'}`}>
                       {subscriptionStatusMessage}

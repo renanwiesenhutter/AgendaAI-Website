@@ -2600,11 +2600,31 @@ React.useEffect(() => {
           
             <div className="bg-white/0 backdrop-blur-sm rounded-lg pl-0 pr-4 py-4 mb-6">
               <div className="grid grid-cols-[2.5rem_1fr_auto] gap-x-3 items-start">
-                <div className="col-start-1 col-span-3 rounded-[10px] border border-white/10 bg-transparent overflow-hidden">
-                  <div className="grid grid-cols-[2.5rem_1fr_auto] gap-x-3 items-start px-4 py-4">
-                    <div className="col-start-1 row-start-1 row-span-2 w-10 h-10 bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center overflow-hidden">
-                      <img src="/images/Logo.png" alt="Logo Agenda AI" className="w-full h-full object-cover" />
-                    </div>
+                <div
+                  className={`col-start-1 col-span-3 rounded-[10px] bg-transparent ${
+                    isAnnual && annualHasTrial
+                      ? 'relative overflow-visible'
+                      : `overflow-hidden border ${isAnnual ? 'border-white/20' : 'border-white/10'}`
+                  }`}
+                >
+                  <div
+                    className={`grid gap-x-3 items-start py-4 ${
+                      isAnnual && annualHasTrial
+                        ? 'relative grid-cols-[2.5rem_1fr_auto] pl-0 pr-0 py-2'
+                        : 'grid-cols-[2.5rem_1fr_auto] px-4'
+                    }`}
+                  >
+                    {uiState !== "success" && (
+                      <div
+                        className={`w-[42px] h-[42px] bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center overflow-hidden ${
+                          isAnnual && annualHasTrial
+                            ? 'absolute -left-[8px] top-1/2 -translate-y-1/2'
+                            : 'col-start-1 row-start-1 row-span-2'
+                        }`}
+                      >
+                        <img src="/images/Logo.png" alt="Logo Agenda AI" className="w-full h-full object-cover" />
+                      </div>
+                    )}
 
                     <p className="col-start-2 text-sm font-medium leading-tight">
                       {`Agenda AI - ${isAnnual ? "Anual" : "Mensal"}`}
@@ -2634,7 +2654,7 @@ React.useEffect(() => {
                   </div>
 
                   {showAnnualUpsell ? (
-                    <div className="border-t border-[#5aa8ff]/45 bg-white/[0.03]">
+                    <div className={`border-t ${isAnnual ? 'border-white/30' : 'border-white/20'} bg-white/[0.03]`}>
                       <button
                         type="button"
                         onClick={handleUpsellToggle}
@@ -2679,7 +2699,11 @@ React.useEffect(() => {
                   ) : null}
                 </div>
 
-                <hr className="col-start-2 col-span-2 my-4 border-white/20" />
+                <hr
+                  className={`col-start-2 col-span-2 border-white/20 ${
+                    isAnnual && annualHasTrial ? 'my-2' : 'my-4'
+                  }`}
+                />
           
                 {/* ===== Subtotal + Cupom + hr ===== */}
                 {uiState !== "success" ? (

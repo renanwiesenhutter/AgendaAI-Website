@@ -271,6 +271,7 @@ function AutoPlayVideo({
 function Home() {
   const [fullscreenMedia, setFullscreenMedia] = useState<{ type: 'image' | 'video', src: string } | null>(null);
   const [imgLoading, setImgLoading] = useState(false);
+  const [mediaReady, setMediaReady] = useState(false);
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentSectionLabel, setCurrentSectionLabel] = useState('Início');
@@ -293,6 +294,7 @@ function Home() {
   const mobileMenuPanelRef = useRef<HTMLDivElement>(null);
   const sectionIndexRef = useRef(0);
   const sectionInitRef = useRef(false);
+  const pageRootRef = useRef<HTMLDivElement>(null);
   const IS_IOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   // Scroll Para a Seção Correta
@@ -318,6 +320,78 @@ function Home() {
       document.removeEventListener('visibilitychange', syncAuthState);
     };
   }, []);
+
+  useEffect(() => {
+    if (mediaReady) return;
+
+    const root = pageRootRef.current;
+    if (!root) {
+      setMediaReady(true);
+      return;
+    }
+
+    const mediaElements = Array.from(root.querySelectorAll('img, video'));
+    if (mediaElements.length === 0) {
+      setMediaReady(true);
+      return;
+    }
+
+    let pending = 0;
+    let cleanedUp = false;
+    const cleanups: Array<() => void> = [];
+
+    const markDone = () => {
+      if (cleanedUp) return;
+      pending -= 1;
+      if (pending <= 0) {
+        setMediaReady(true);
+      }
+    };
+
+    mediaElements.forEach((element) => {
+      if (element instanceof HTMLImageElement) {
+        if (element.complete && element.naturalWidth > 0) return;
+        pending += 1;
+        const onFinish = () => markDone();
+        element.addEventListener('load', onFinish, { once: true });
+        element.addEventListener('error', onFinish, { once: true });
+        cleanups.push(() => {
+          element.removeEventListener('load', onFinish);
+          element.removeEventListener('error', onFinish);
+        });
+        return;
+      }
+
+      if (element instanceof HTMLVideoElement) {
+        if (element.readyState >= 1) return;
+        pending += 1;
+        const onFinish = () => markDone();
+        element.addEventListener('loadedmetadata', onFinish, { once: true });
+        element.addEventListener('canplay', onFinish, { once: true });
+        element.addEventListener('error', onFinish, { once: true });
+        cleanups.push(() => {
+          element.removeEventListener('loadedmetadata', onFinish);
+          element.removeEventListener('canplay', onFinish);
+          element.removeEventListener('error', onFinish);
+        });
+      }
+    });
+
+    if (pending === 0) {
+      setMediaReady(true);
+      return;
+    }
+
+    const fallbackTimer = window.setTimeout(() => {
+      setMediaReady(true);
+    }, 9000);
+
+    return () => {
+      cleanedUp = true;
+      window.clearTimeout(fallbackTimer);
+      cleanups.forEach((cleanup) => cleanup());
+    };
+  }, [mediaReady]);
 
   const smoothScrollTo = React.useCallback((targetTop: number) => {
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -942,7 +1016,31 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
   }, [mobileMenuOpen]);
 
   return (
-    <div className="min-h-screen bg-[#f7fbff]" onClick={handleAnchorClick}>
+    <>
+      {!mediaReady && (
+        <div className="fixed inset-0 z-[999] bg-white flex justify-center pt-[28vh]" aria-label="Carregando mídia">
+          <div className="agenda-loader-calendar" aria-hidden="true">
+            <span className="agenda-loader-calendar-ring agenda-loader-calendar-ring-left" />
+            <span className="agenda-loader-calendar-ring agenda-loader-calendar-ring-right" />
+            <span className="agenda-loader-calendar-header" />
+            <span className="agenda-loader-calendar-body" />
+            <span className="agenda-loader-calendar-cell agenda-loader-calendar-cell-1" />
+            <span className="agenda-loader-calendar-cell agenda-loader-calendar-cell-2" />
+            <span className="agenda-loader-calendar-cell agenda-loader-calendar-cell-3" />
+            <span className="agenda-loader-calendar-cell agenda-loader-calendar-cell-4" />
+            <span className="agenda-loader-calendar-cell agenda-loader-calendar-cell-5" />
+            <span className="agenda-loader-calendar-cell agenda-loader-calendar-cell-6" />
+            <span className="agenda-loader-calendar-marker" />
+          </div>
+        </div>
+      )}
+
+      <div
+        ref={pageRootRef}
+        className={`min-h-screen bg-[#f7fbff] transition-opacity duration-300 ${mediaReady ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={handleAnchorClick}
+        aria-busy={!mediaReady}
+      >
       <div id="top" />
       {/* Header - Fixed */}
       <header
@@ -2154,6 +2252,99 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
           filter: drop-shadow(0 10px 20px rgba(0,0,0,0.12));
         }
 
+        @keyframes agenda-calendar-float {
+          0%, 100% { transform: translateY(0) rotate(-6deg); }
+          50% { transform: translateY(-2px) rotate(-6deg); }
+        }
+
+        @keyframes agenda-calendar-marker {
+          0%, 10% { transform: translate(0, 0) scale(1); }
+          22% { transform: translate(12px, 0) scale(1); }
+          36% { transform: translate(24px, 0) scale(1); }
+          50% { transform: translate(0, 12px) scale(1); }
+          64% { transform: translate(12px, 12px) scale(1.04); }
+          78%, 100% { transform: translate(24px, 12px) scale(1); }
+        }
+
+        @keyframes agenda-calendar-cell-pulse {
+          0%, 100% { opacity: 0.33; }
+          50% { opacity: 0.72; }
+        }
+
+        .agenda-loader-calendar {
+          position: relative;
+          width: 58px;
+          height: 52px;
+          animation: agenda-calendar-float 1.2s ease-in-out infinite;
+          filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.09));
+        }
+
+        .agenda-loader-calendar-ring {
+          position: absolute;
+          top: -3px;
+          width: 9px;
+          height: 10px;
+          border-radius: 4px;
+          background: #bec3ca;
+          z-index: 3;
+        }
+
+        .agenda-loader-calendar-ring-left { left: 11px; }
+        .agenda-loader-calendar-ring-right { right: 11px; }
+
+        .agenda-loader-calendar-header {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 15px;
+          border-radius: 9px 9px 5px 5px;
+          background: linear-gradient(180deg, #c7cbd2 0%, #bcc2c9 100%);
+          z-index: 2;
+        }
+
+        .agenda-loader-calendar-body {
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 11px;
+          bottom: 0;
+          border-radius: 0 0 9px 9px;
+          background: linear-gradient(180deg, #d8dbe0 0%, #cfd3d9 100%);
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+          z-index: 1;
+        }
+
+        .agenda-loader-calendar-cell {
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          border-radius: 2px;
+          background: rgba(157, 164, 174, 0.9);
+          z-index: 4;
+          animation: agenda-calendar-cell-pulse 1.2s ease-in-out infinite;
+        }
+
+        .agenda-loader-calendar-cell-1 { left: 12px; top: 22px; animation-delay: 0s; }
+        .agenda-loader-calendar-cell-2 { left: 24px; top: 22px; animation-delay: 0.1s; }
+        .agenda-loader-calendar-cell-3 { left: 36px; top: 22px; animation-delay: 0.2s; }
+        .agenda-loader-calendar-cell-4 { left: 12px; top: 34px; animation-delay: 0.3s; }
+        .agenda-loader-calendar-cell-5 { left: 24px; top: 34px; animation-delay: 0.4s; }
+        .agenda-loader-calendar-cell-6 { left: 36px; top: 34px; animation-delay: 0.5s; }
+
+        .agenda-loader-calendar-marker {
+          position: absolute;
+          left: 11px;
+          top: 21px;
+          width: 10px;
+          height: 10px;
+          border-radius: 3px;
+          border: 2px solid rgba(114, 121, 131, 0.92);
+          background: rgba(227, 230, 234, 0.45);
+          z-index: 5;
+          animation: agenda-calendar-marker 1.8s cubic-bezier(0.45, 0.03, 0.4, 1) infinite;
+        }
+
         @keyframes loadingbar {
         0%   { transform: translateX(-100%); }
         100% { transform: translateX(300%); }
@@ -2223,7 +2414,8 @@ const onCardPointerUp = (e: React.PointerEvent, i: number, item: (typeof depoIte
           }
         }
       `}</style>
-    </div>
+      </div>
+    </>
   );
 }
 
