@@ -2528,6 +2528,7 @@ React.useEffect(() => {
           )}
         
           {/* DESKTOP */}
+          {uiState !== "success" ? (
           <div className="hidden lg:block w-full lg:max-w-[420px] lg:ml-auto">
             <div className="mb-6 mt-4">
               <div className="flex items-baseline group cursor-default">
@@ -2653,7 +2654,7 @@ React.useEffect(() => {
                     </div>
                   </div>
 
-                  {showAnnualUpsell ? (
+                  {uiState !== "success" && showAnnualUpsell ? (
                     <div className={`border-t ${isAnnual ? 'border-white/30' : 'border-white/20'} bg-white/[0.03]`}>
                       <button
                         type="button"
@@ -2889,6 +2890,7 @@ React.useEffect(() => {
               </div>
             </div>
           </div>
+          ) : null}
         </aside>
 
         {/* COLUNA DIREITA */}
