@@ -1088,6 +1088,7 @@ const CheckoutPage = () => {
   const [chipEnter, setChipEnter] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [couponRevalidating, setCouponRevalidating] = useState(false);
   const [exiting, setExiting]   = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [name, setName] = React.useState("");
@@ -1215,6 +1216,7 @@ const [searchParams] = useSearchParams();
 
 const planQ = (searchParams.get("plan") || "").toLowerCase(); // "annual" | "monthly"
 const upsellQ = (searchParams.get("upsell") || "").toLowerCase();
+const couponQ = (searchParams.get("coupon") || searchParams.get("cupom") || "").trim();
 const seg = location.pathname.split("/").pop()?.toLowerCase(); // .../checkout/mensal etc.
 
 const initialPlan =
@@ -1227,41 +1229,50 @@ const shouldPresetUpsell =
 
 const [selectedPlan, setSelectedPlan] = React.useState<"annual" | "monthly">(initialPlan);
 const [upsellAnimating, setUpsellAnimating] = React.useState(false);
-const [forceAnnualNoTrial, setForceAnnualNoTrial] = React.useState(false);
 const appliedCouponRef = React.useRef<string | null>(null);
 
 React.useEffect(() => {
   setSelectedPlan(shouldPresetUpsell ? "annual" : initialPlan);
   setUpsellAnimating(false);
-  setForceAnnualNoTrial(shouldPresetUpsell);
 }, [initialPlan, shouldPresetUpsell]);
 
 const isAnnual = selectedPlan === "annual";
-const annualHasTrial = isAnnual && !forceAnnualNoTrial && !(lookup.usedTrial === true);
+const annualHasTrial = isAnnual && !(lookup.usedTrial === true);
 
 const handleUpsellToggle = React.useCallback(() => {
   if (upsellAnimating) return;
   const nextPlan: "annual" | "monthly" = selectedPlan === "annual" ? "monthly" : "annual";
   const couponCode = appliedCouponRef.current;
+  const REMOVE_TOTAL_MS = 1200;
+  const EXIT_MS = 300;
 
   setUpsellAnimating(true);
-  if (nextPlan === "annual") setForceAnnualNoTrial(true);
 
   window.setTimeout(async () => {
     setSelectedPlan(nextPlan);
-    if (nextPlan === "monthly") setForceAnnualNoTrial(false);
 
     if (couponCode) {
-      setApplied(null);
+      setExiting(false);
+      setCouponRevalidating(true);
       const revalidated = await validateCouponForPlan(couponCode, nextPlan);
       if (revalidated.ok && revalidated.coupon) {
         setApplied(revalidated.coupon);
+        setCouponRevalidating(false);
+      } else {
+        window.setTimeout(() => setExiting(true), REMOVE_TOTAL_MS - EXIT_MS);
+        window.setTimeout(() => {
+          setApplied(null);
+          setExiting(false);
+          setCouponRevalidating(false);
+        }, REMOVE_TOTAL_MS);
       }
     }
 
     setUpsellAnimating(false);
   }, 1000);
 }, [selectedPlan, upsellAnimating]);
+
+const couponBusy = removing || couponRevalidating;
 
 const showAnnualTheme = isAnnual;
 const showUpsellBorderLoading = upsellAnimating && selectedPlan === "monthly";
@@ -1698,8 +1709,40 @@ React.useEffect(() => {
     return { ok: true };
   }, [selectedPlan, validateCouponForPlan]);
 
+  const autoCouponAttemptRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const autoCode = couponQ.trim();
+    if (!autoCode) return;
+    if (lookup.hasActive) return;
+
+    const startupPlan: "annual" | "monthly" = shouldPresetUpsell ? "annual" : initialPlan;
+    if (selectedPlan !== startupPlan) return;
+
+    const attemptKey = `${autoCode.toLowerCase()}|${startupPlan}`;
+    if (autoCouponAttemptRef.current === attemptKey) return;
+    if ((appliedCouponRef.current || "").toLowerCase() === autoCode.toLowerCase()) {
+      autoCouponAttemptRef.current = attemptKey;
+      return;
+    }
+
+    autoCouponAttemptRef.current = attemptKey;
+    let cancelled = false;
+
+    (async () => {
+      const resp = await validateCouponForPlan(autoCode, startupPlan);
+      if (cancelled) return;
+      if (resp.ok && resp.coupon) {
+        setApplied(resp.coupon);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [couponQ, lookup.hasActive, shouldPresetUpsell, initialPlan, selectedPlan, validateCouponForPlan]);
+
   // Pega data da cobrança
-  const trialDays = isAnnual ? 7 : 0;
+  const trialDays = annualHasTrial ? 7 : 0;
   const chargeDateStr = useMemo(() => {
     const tz = "America/Sao_Paulo";
     const now = new Date();
@@ -1755,9 +1798,12 @@ React.useEffect(() => {
   const monthlySubtotalAfterCents = Math.max(FULL_PRICE_MONTHLY_CENTS - discountOnMonthlyCents, 0);
   const annualSubtotalAfterCents = Math.max(FULL_PRICE_ANNUAL_CENTS - discountOnAnnualCents, 0);
   const annualMonthlyEquivalentCents = Math.round(annualSubtotalAfterCents / 12);
-  const upsellSavingsCents = Math.max((monthlySubtotalAfterCents * 12) - annualSubtotalAfterCents, 0);
-  const showAnnualUpsell = !lookup.hasActive && (initialPlan === "monthly" || selectedPlan === "monthly" || forceAnnualNoTrial);
+  const upsellSavingsCents = isAnnual
+    ? Math.max((FULL_PRICE_MONTHLY_CENTS * 12) - annualSubtotalAfterCents, 0)
+    : Math.max((FULL_PRICE_MONTHLY_CENTS * 12) - FULL_PRICE_ANNUAL_CENTS, 0);
+  const showAnnualUpsell = !lookup.hasActive && (initialPlan === "monthly" || selectedPlan === "monthly");
   const showAnnualComparison = showAnnualUpsell && isAnnual && !annualHasTrial;
+  const useAnnualTrialCompactLayout = isAnnual && annualHasTrial && !showAnnualUpsell;
 
   const nowAmountCents   = annualHasTrial ? 0 : subtotalAfterCents;
   const recurringAmountCents = subtotalAfterCents;
@@ -2100,9 +2146,14 @@ React.useEffect(() => {
                         annualHasTrial ? (
                           <>
                             <p className="text-sm font-semibold">7 dias grátis</p>
-                            <p className="text-xs font-medium text-[#FFFFFF80]">
-                              Depois {fmtBRL(subtotalAfterCents)}/ano
-                            </p>
+                            <div
+                              className="overflow-hidden"
+                              style={showAnnualUpsell ? { animation: "upsell-compare-drop 560ms cubic-bezier(0.22,1,0.36,1)" } : undefined}
+                            >
+                              <p className="text-xs font-medium text-[#FFFFFF80]">
+                                Depois {fmtBRL(subtotalAfterCents)}/ano
+                              </p>
+                            </div>
                           </>
                         ) : (
                           <p className="text-sm font-medium">{fmtBRL(subtotalAfterCents)}</p>
@@ -2149,19 +2200,19 @@ React.useEffect(() => {
                           >
                             <Tag className="w-3.5 h-3.5 text-white/90" />
                             <span className="text-white font-semibold text-sm tracking-wide mr-2">
-                              {applied.code}
+                              {applied.code.toUpperCase()}
                             </span>
       
                             {/* botão remover SÓ no pré-sucesso */}
                             <button
                               type="button"
                               aria-label="Remover cupom"
-                              disabled={removing}
+                              disabled={couponBusy}
                               onClick={() => {
-                              if (couponLocked) return;                
-                              setShowDetails(true);
-                              setTimeout(() => couponRefMobile.current?.open(), 200);
-                                if (removing) return;
+                               if (couponLocked) return;                
+                               setShowDetails(true);
+                               setTimeout(() => couponRefMobile.current?.open(), 200);
+                                if (couponBusy) return;
                                 setRemoving(true);
                                 const REMOVE_TOTAL_MS = 1200;
                                 const EXIT_MS = 300;
@@ -2174,7 +2225,7 @@ React.useEffect(() => {
                               }}
                               className="group flex items-center justify-center"
                             >
-                              {removing ? (
+                              {couponBusy ? (
                                 <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="3" />
                                   <path
@@ -2191,7 +2242,7 @@ React.useEffect(() => {
                             </button>
                           </div>
       
-                          {removing ? (
+                          {couponBusy ? (
                             <div className="relative w-16 h-6 rounded-md overflow-hidden bg-white/20">
                               <div
                                 key={`sheen-mobile-${applied.code}`}
@@ -2249,7 +2300,7 @@ React.useEffect(() => {
                         <div className="inline-flex h-9 items-center gap-2 rounded-md bg-white/15 px-3">
                           <Tag className="w-3.5 h-3.5 text-white/90" />
                           <span className="text-white font-semibold text-sm tracking-wide mr-2">
-                            {applied.code}
+                            {applied.code.toUpperCase()}
                           </span>
                           {/* sem botão de remover na confirmação */}
                         </div>
@@ -2417,9 +2468,14 @@ React.useEffect(() => {
                   annualHasTrial ? (
                     <>
                       <h1 className="text-[30px] font-bold mb-0">7 dias grátis</h1>
-                      <p className="text-[#ffffff99] text-sm font-medium leading-snug">
-                        Depois, <span className="font-bold">{fmtBRL(subtotalAfterCents)}</span> por ano começando em {chargeDateStr}
-                      </p>
+                      <div
+                        className="overflow-hidden"
+                        style={showAnnualUpsell ? { animation: "upsell-compare-drop 560ms cubic-bezier(0.22,1,0.36,1)" } : undefined}
+                      >
+                        <p className="text-[#ffffff99] text-sm font-medium leading-snug">
+                          Depois,{" "}<span className="font-bold">{fmtBRL(subtotalAfterCents)}</span> por ano começando em {chargeDateStr}
+                        </p>
+                      </div>
                     </>
                   ) : (
                     <>
@@ -2510,7 +2566,7 @@ React.useEffect(() => {
                       <span
                         className="h-3 w-3 rounded-full bg-white shadow-sm"
                         style={{
-                          transform: isAnnual ? "translateX(10px)" : "translateX(0)",
+                          transform: isAnnual ? "translateX(12px)" : "translateX(0)",
                           transition: "transform 280ms cubic-bezier(0.22, 1, 0.36, 1)",
                         }}
                       />
@@ -2557,9 +2613,14 @@ React.useEffect(() => {
                 annualHasTrial ? (
                   <>
                     <h1 className="text-4xl font-bold mb-2">7 dias grátis</h1>
-                    <p className="text-[#ffffff99] text-sm font-semibold">
-                      Depois, <span className="text-sm font-bold">{fmtBRL(subtotalAfterCents)}</span> por ano começando em {chargeDateStr}
-                    </p>
+                    <div
+                      className="overflow-hidden"
+                      style={showAnnualUpsell ? { animation: "upsell-compare-drop 560ms cubic-bezier(0.22,1,0.36,1)" } : undefined}
+                    >
+                      <p className="text-[#ffffff99] text-sm font-semibold">
+                        Depois,{" "}<span className="text-sm font-bold">{fmtBRL(subtotalAfterCents)}</span> por ano começando em {chargeDateStr}
+                      </p>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -2603,14 +2664,14 @@ React.useEffect(() => {
               <div className="grid grid-cols-[2.5rem_1fr_auto] gap-x-3 items-start">
                 <div
                   className={`col-start-1 col-span-3 rounded-[10px] bg-transparent ${
-                    isAnnual && annualHasTrial
+                    useAnnualTrialCompactLayout
                       ? 'relative overflow-visible'
                       : `overflow-hidden border ${isAnnual ? 'border-white/20' : 'border-white/10'}`
                   }`}
                 >
                   <div
                     className={`grid gap-x-3 items-start py-4 ${
-                      isAnnual && annualHasTrial
+                      useAnnualTrialCompactLayout
                         ? 'relative grid-cols-[2.5rem_1fr_auto] pl-0 pr-0 py-2'
                         : 'grid-cols-[2.5rem_1fr_auto] px-4'
                     }`}
@@ -2618,7 +2679,7 @@ React.useEffect(() => {
                     {uiState !== "success" && (
                       <div
                         className={`w-[42px] h-[42px] bg-gradient-to-r from-blue-500 to-green-600 rounded-md flex items-center justify-center overflow-hidden ${
-                          isAnnual && annualHasTrial
+                          useAnnualTrialCompactLayout
                             ? 'absolute -left-[8px] top-1/2 -translate-y-1/2'
                             : 'col-start-1 row-start-1 row-span-2'
                         }`}
@@ -2643,7 +2704,12 @@ React.useEffect(() => {
                         annualHasTrial ? (
                           <>
                             <p className="text-sm font-medium">7 dias grátis</p>
-                            <p className="text-xs text-[#ffffff80]">Depois {fmtBRL(subtotalAfterCents)}/ano</p>
+                            <div
+                              className="overflow-hidden"
+                              style={showAnnualUpsell ? { animation: "upsell-compare-drop 560ms cubic-bezier(0.22,1,0.36,1)" } : undefined}
+                            >
+                              <p className="text-xs text-[#ffffff80]">Depois {fmtBRL(subtotalAfterCents)}/ano</p>
+                            </div>
                           </>
                         ) : (
                           <p className="text-sm font-medium">{fmtBRL(subtotalAfterCents)}</p>
@@ -2684,7 +2750,7 @@ React.useEffect(() => {
                               <span
                                 className="h-3 w-3 rounded-full bg-white shadow-sm"
                                 style={{
-                                  transform: isAnnual ? "translateX(10px)" : "translateX(0)",
+                                  transform: isAnnual ? "translateX(12px)" : "translateX(0)",
                                   transition: "transform 280ms cubic-bezier(0.22, 1, 0.36, 1)",
                                 }}
                               />
@@ -2702,7 +2768,7 @@ React.useEffect(() => {
 
                 <hr
                   className={`col-start-2 col-span-2 border-white/20 ${
-                    isAnnual && annualHasTrial ? 'my-2' : 'my-4'
+                    useAnnualTrialCompactLayout ? 'my-2' : 'my-4'
                   }`}
                 />
           
@@ -2744,16 +2810,16 @@ React.useEffect(() => {
                             >
                               <Tag className="w-3.5 h-3.5 text-white/90" />
                               <span className="text-white font-semibold text-sm tracking-wide mr-2">
-                                {applied.code}
+                                {applied.code.toUpperCase()}
                               </span>
                     
                               {/* Botão remover SÓ no pré-sucesso */}
                               <button
                                 type="button"
                                 aria-label="Remover cupom"
-                                disabled={removing || couponLocked}
+                                disabled={couponBusy || couponLocked}
                                 onClick={() => {
-                                  if (removing || couponLocked) return;     // <-- trava aqui
+                                  if (couponBusy || couponLocked) return;     // <-- trava aqui
                                   setRemoving(true);
                                   const REMOVE_TOTAL_MS = 1200;
                                   const EXIT_MS = 300;
@@ -2766,7 +2832,7 @@ React.useEffect(() => {
                                 }}
                                 className={`group flex items-center justify-center ${couponLocked ? "opacity-60" : ""}`}
                               >
-                                {removing ? (
+                                {couponBusy ? (
                                   <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="3" />
                                     <path className="opacity-80" d="M22 12a10 10 0 0 1-10 10" stroke="white" strokeWidth="3" strokeLinecap="round" />
@@ -2777,7 +2843,7 @@ React.useEffect(() => {
                               </button>
                             </div>
                     
-                            {removing ? (
+                            {couponBusy ? (
                               <div className="relative w-16 h-6 rounded-md overflow-hidden bg-white/20">
                                 <div
                                   key={`sheen-desktop-${applied.code}`}
@@ -2837,7 +2903,7 @@ React.useEffect(() => {
                           <div className="inline-flex h-9 items-center gap-2 rounded-md bg-white/15 px-3">
                             <Tag className="w-3.5 h-3.5 text-white/90" />
                             <span className="text-white font-semibold text-sm tracking-wide mr-2">
-                              {applied.code}
+                              {applied.code.toUpperCase()}
                             </span>
                             {/* sem botão de remover na confirmação */}
                           </div>
